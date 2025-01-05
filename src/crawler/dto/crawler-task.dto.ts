@@ -6,10 +6,13 @@ export class SchemaFieldDto {
   type: 'string' | 'number' | 'float' | 'array' | 'object';
 
   @IsOptional()
-  @IsObject()
-  items?: {
-    [key: string]: SchemaFieldDto;
-  };
+  @IsEnum(['string', 'number', 'float', 'object'])
+  itemType?: 'string' | 'number' | 'float' | 'object';
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SchemaFieldDto)
+  items?: SchemaFieldDto;
 
   @IsOptional()
   @IsObject()
@@ -46,6 +49,8 @@ export class CrawlerTaskDto {
 
   @IsOptional()
   @IsObject()
+  @ValidateNested({ each: true })
+  @Type(() => SchemaFieldDto)
   schema?: {
     [key: string]: SchemaFieldDto;
   };

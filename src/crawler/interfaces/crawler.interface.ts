@@ -6,9 +6,8 @@ export interface FocusPoint {
 
 export interface SchemaField {
   type: 'string' | 'number' | 'float' | 'array' | 'object';
-  items?: {
-    [key: string]: SchemaField;
-  };
+  itemType?: 'string' | 'number' | 'float' | 'object';
+  items?: SchemaField;
   properties?: {
     [key: string]: SchemaField;
   };

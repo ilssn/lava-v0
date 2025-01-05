@@ -4,7 +4,6 @@ import OpenAI from 'openai';
 import { Schema } from '../crawler/interfaces/crawler.interface';
 import {
   STRUCTURED_DATA_EXTRACTION_PROMPT,
-  AUTHOR_DATE_EXTRACTION_PROMPT,
   RELATED_LINKS_EXTRACTION_PROMPT,
 } from './prompts/extract.prompt';
 
@@ -14,13 +13,17 @@ export class ExtractorService {
   private readonly openai: OpenAI;
   private readonly defaultSchema: Schema = {
     title: { type: 'string' },
-    price: { type: 'float' },
-    description: { type: 'string' },
-    specifications: {
-      type: 'array',
-      items: {
-        name: { type: 'string' },
-        value: { type: 'string' }
+    content: { type: 'string' },
+    metadata: {
+      type: 'object',
+      properties: {
+        author: { type: 'string' },
+        date: { type: 'string' },
+        views: { type: 'number' },
+        tags: {
+          type: 'array',
+          itemType: 'string'
+        }
       }
     }
   };
@@ -75,27 +78,6 @@ export class ExtractorService {
       }
     } catch (error) {
       this.logger.error(`Error extracting structured data: ${error.message}`);
-      throw error;
-    }
-  }
-
-  async extractAuthorAndDate(text: string) {
-    try {
-      this.logger.debug('Preparing author and date extraction prompt');
-      const prompt = AUTHOR_DATE_EXTRACTION_PROMPT.replace('{text}', text);
-
-      this.logger.debug('Calling AI model for author and date extraction');
-      const response = await this.callModel(prompt, true);
-
-      this.logger.debug('Parsing AI response');
-      try {
-        return JSON.parse(response);
-      } catch (parseError) {
-        this.logger.error(`Failed to parse AI response: ${response}`);
-        throw new Error(`Invalid AI response format: ${parseError.message}`);
-      }
-    } catch (error) {
-      this.logger.error(`Error extracting author and date: ${error.message}`);
       throw error;
     }
   }

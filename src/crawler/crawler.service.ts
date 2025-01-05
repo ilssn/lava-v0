@@ -198,10 +198,8 @@ export class CrawlerService {
 
             const textContent = $('body').text();
 
-            const [extractedData, authorAndDate] = await Promise.all([
-              extractorService.extractStructuredData(textContent, task.schema),
-              extractorService.extractAuthorAndDate(textContent),
-            ]);
+            // 提取结构化数据
+            const extractedData = await extractorService.extractStructuredData(textContent, task.schema);
 
             // 上传截图
             let screenshotUrl = '';
@@ -241,8 +239,8 @@ export class CrawlerService {
 
             const extractedInfo: ExtractedInfo = {
               url,
-              author: authorAndDate.source,
-              publishDate: authorAndDate.publish_date,
+              author: extractedData.metadata?.author || 'NA',
+              publishDate: extractedData.metadata?.date || 'NA',
               screenshot: screenshotUrl,
               data: extractedData,
               relatedUrls,
