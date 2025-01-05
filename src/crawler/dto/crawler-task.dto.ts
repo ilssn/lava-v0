@@ -10,12 +10,9 @@ export class SchemaFieldDto {
   itemType?: 'string' | 'number' | 'float' | 'object';
 
   @IsOptional()
-  @ValidateNested()
-  @Type(() => SchemaFieldDto)
   items?: SchemaFieldDto;
 
   @IsOptional()
-  @IsObject()
   properties?: {
     [key: string]: SchemaFieldDto;
   };
@@ -48,9 +45,6 @@ export class CrawlerTaskDto {
   recursiveConfig?: RecursiveConfigDto;
 
   @IsOptional()
-  @IsObject()
-  @ValidateNested({ each: true })
-  @Type(() => SchemaFieldDto)
   schema?: {
     [key: string]: SchemaFieldDto;
   };

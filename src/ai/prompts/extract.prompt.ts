@@ -20,11 +20,11 @@ Schema定义：{schema}
 
 示例schema:
 {
-  "title": { "type": "string" },
-  "content": { "type": "string" },
+  "summary": { "type": "string" },
   "metadata": {
     "type": "object",
     "properties": {
+      "title": { "type": "string" },
       "author": { "type": "string" },
       "date": { "type": "string" },
       "views": { "type": "number" },
@@ -38,9 +38,9 @@ Schema定义：{schema}
 
 示例输出:
 {
-  "title": "文章标题",
-  "content": "这是文章的主要内容",
+  "summary": "这是文章的内容总结",
   "metadata": {
+    "title": "文章标题",
     "author": "作者名称",
     "date": "2024-01-05",
     "views": 123,
@@ -48,18 +48,37 @@ Schema定义：{schema}
   }
 }`;
 
-export const RELATED_LINKS_EXTRACTION_PROMPT = `你是一个链接筛选助手。请根据给定的schema从文本及URL中筛选出相关链接。
+export const RELATED_LINKS_EXTRACTION_PROMPT = `你是一个链接筛选助手。请根据任务描述和数据模式从给定的链接列表中筛选出相关链接。
 
-Schema定义：{schema}
-文本内容：{text}
-链接字典：{linkDict}
+任务描述：{target}
+数据模式：{schema}
+链接列表：{links}
 
-请直接返回一个JSON数组，包含筛选出的URL，不要添加任何其他格式标记。格式如下：
+每个链接包含以下信息：
+- url: 链接地址
+- title: 链接文本或标题
+- description: 链接描述或上下文
+- attributes: 链接的HTML属性
+- context: 链接的上下文信息
+  - parentText: 父元素文本
+  - siblingText: 相邻元素文本
+  - headings: 所在区域的标题层级
+
+请按照以下优先级筛选链接:
+1. 首先确认链接是否为有效的网页链接(http/https开头)
+2. 过滤掉非网页链接，比如媒体链接比如图片视频音频、文件链接等
+2. 如果提供了任务描述，优先根据任务描述判断链接是否相关
+3. 如果提供了数据模式，分析链接的上下文是否包含模式中定义的字段相关信息
+4. 分析链接的标题、描述和上下文信息，判断其相关性
+5. 如果链接的上下文信息与数据模式中的字段匹配度较高，说明该链接可能包含相似结构的数据
+
+请直接返回一个JSON数组,包含筛选出的URL,不要添加任何其他格式标记。格式如下:
 ["url1", "url2", "url3"]
 
 注意：
 1. 只返回JSON数组数据本身
 2. 不要添加任何额外的格式标记或说明文字
 3. 确保返回的是合法的JSON格式
-4. 如果没有相关链接，返回空数组 []
-5. 根据schema中定义的内容主题筛选相关链接`; 
+4. 如果没有相关链接,返回空数组 []
+5. 优先根据任务描述筛选,其次参考数据模式
+6. 确保返回的URL是完整的、有效的网页链接`; 

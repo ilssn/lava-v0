@@ -1,3 +1,17 @@
+export interface LinkInfo {
+  url: string;
+  title?: string;  // 链接文本或标题
+  description?: string;  // 链接描述或上下文
+  attributes?: {  // 链接的HTML属性
+    [key: string]: string;
+  };
+  context?: {  // 链接的上下文信息
+    parentText?: string;  // 父元素文本
+    siblingText?: string;  // 相邻元素文本
+    headings?: string[];  // 所在区域的标题层级
+  };
+}
+
 export interface FocusPoint {
   id: string;
   focuspoint: string;
@@ -17,15 +31,24 @@ export interface Schema {
   [key: string]: SchemaField;
 }
 
+export interface RecursiveConfig {
+  maxDepth: number;
+  maxUrls?: number;
+  urlPattern?: string;
+  excludePattern?: string;
+  // 链接筛选规则
+  urlFilters?: {
+    include?: string[];  // 包含这些字符串的链接会被保留
+    exclude?: string[];  // 包含这些字符串的链接会被排除
+    articlePattern?: string;  // 文章URL的正则表达式
+  };
+}
+
 export interface CrawlerTask {
   url: string;
-  recursiveConfig?: {
-    maxDepth: number;
-    maxUrls?: number;
-    urlPattern?: string;
-    excludePattern?: string;
-  };
-  schema?: Schema;
+  target?: string;  // 任务描述，用于筛选相关链接
+  recursiveConfig?: RecursiveConfig;
+  schema?: Schema;  // 数据提取模式，也用于辅助判断链接相关性
 }
 
 export interface ExtractedInfo {

@@ -6,6 +6,7 @@ import {
   STRUCTURED_DATA_EXTRACTION_PROMPT,
   RELATED_LINKS_EXTRACTION_PROMPT,
 } from './prompts/extract.prompt';
+import { LinkInfo } from '../crawler/interfaces/crawler.interface';
 
 @Injectable()
 export class ExtractorService {
@@ -82,13 +83,13 @@ export class ExtractorService {
     }
   }
 
-  async extractRelatedLinks(text: string, linkDict: Record<string, string>, schema?: Schema) {
+  async extractRelatedLinks(links: LinkInfo[], target?: string, schema?: Schema): Promise<string[]> {
     try {
       this.logger.debug('Preparing related links extraction prompt');
       const prompt = RELATED_LINKS_EXTRACTION_PROMPT
-        .replace('{schema}', JSON.stringify(schema || this.defaultSchema, null, 2))
-        .replace('{text}', text)
-        .replace('{linkDict}', JSON.stringify(linkDict, null, 2));
+        .replace('{target}', target || '')
+        .replace('{schema}', schema ? JSON.stringify(schema, null, 2) : '{}')
+        .replace('{links}', JSON.stringify(links, null, 2));
 
       this.logger.debug('Calling AI model for related links extraction');
       const response = await this.callModel(prompt, true);
