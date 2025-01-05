@@ -1,18 +1,29 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { FocusPoint } from '../crawler/interfaces/crawler.interface';
+import { Schema } from '../crawler/interfaces/crawler.interface';
 import {
-  CONTENT_EXTRACTION_PROMPT,
+  STRUCTURED_DATA_EXTRACTION_PROMPT,
   AUTHOR_DATE_EXTRACTION_PROMPT,
   RELATED_LINKS_EXTRACTION_PROMPT,
-  CONTENT_VALIDATION_PROMPT,
 } from './prompts/extract.prompt';
 
 @Injectable()
 export class ExtractorService {
   private readonly logger = new Logger(ExtractorService.name);
   private readonly openai: OpenAI;
+  private readonly defaultSchema: Schema = {
+    title: { type: 'string' },
+    price: { type: 'float' },
+    description: { type: 'string' },
+    specifications: {
+      type: 'array',
+      items: {
+        name: { type: 'string' },
+        value: { type: 'string' }
+      }
+    }
+  };
 
   constructor(private configService: ConfigService) {
     const config = this.configService.get('config');
@@ -45,14 +56,14 @@ export class ExtractorService {
     return response.choices[0].message.content || '';
   }
 
-  async extractContent(text: string, focusPoints: FocusPoint[]) {
+  async extractStructuredData(text: string, schema?: Schema) {
     try {
-      this.logger.debug('Preparing content extraction prompt');
-      const prompt = CONTENT_EXTRACTION_PROMPT
-        .replace('{focusPoints}', JSON.stringify(focusPoints, null, 2))
+      this.logger.debug('Preparing structured data extraction prompt');
+      const prompt = STRUCTURED_DATA_EXTRACTION_PROMPT
+        .replace('{schema}', JSON.stringify(schema || this.defaultSchema, null, 2))
         .replace('{text}', text);
 
-      this.logger.debug('Calling AI model for content extraction');
+      this.logger.debug('Calling AI model for structured data extraction');
       const response = await this.callModel(prompt);
 
       this.logger.debug('Parsing AI response');
@@ -63,7 +74,7 @@ export class ExtractorService {
         throw new Error(`Invalid AI response format: ${parseError.message}`);
       }
     } catch (error) {
-      this.logger.error(`Error extracting content: ${error.message}`);
+      this.logger.error(`Error extracting structured data: ${error.message}`);
       throw error;
     }
   }
@@ -89,47 +100,26 @@ export class ExtractorService {
     }
   }
 
-  async extractRelatedLinks(text: string, linkDict: Record<string, string>, focusPoints: FocusPoint[]) {
+  async extractRelatedLinks(text: string, linkDict: Record<string, string>, schema?: Schema) {
     try {
       this.logger.debug('Preparing related links extraction prompt');
       const prompt = RELATED_LINKS_EXTRACTION_PROMPT
-        .replace('{focusPoints}', JSON.stringify(focusPoints, null, 2))
+        .replace('{schema}', JSON.stringify(schema || this.defaultSchema, null, 2))
         .replace('{text}', text)
         .replace('{linkDict}', JSON.stringify(linkDict, null, 2));
 
       this.logger.debug('Calling AI model for related links extraction');
       const response = await this.callModel(prompt, true);
 
-      this.logger.debug('Processing response');
-      const match = response.match(/"""([\s\S]*?)"""/);
-      if (!match) {
-        this.logger.warn('No URLs found between triple quotes');
+      this.logger.debug('Parsing AI response');
+      try {
+        return JSON.parse(response);
+      } catch (parseError) {
+        this.logger.error(`Failed to parse AI response: ${response}`);
         return [];
       }
-
-      return match[1]
-        .split('\n')
-        .map(url => url.trim())
-        .filter(url => url && url.startsWith('http'));
     } catch (error) {
       this.logger.error(`Error extracting related links: ${error.message}`);
-      throw error;
-    }
-  }
-
-  async validateContent(content: string, text: string) {
-    try {
-      this.logger.debug('Preparing content validation prompt');
-      const prompt = CONTENT_VALIDATION_PROMPT
-        .replace('{content}', content)
-        .replace('{text}', text);
-
-      this.logger.debug('Calling AI model for content validation');
-      const response = await this.callModel(prompt, true);
-
-      return response.toLowerCase().includes('是');
-    } catch (error) {
-      this.logger.error(`Error validating content: ${error.message}`);
       throw error;
     }
   }

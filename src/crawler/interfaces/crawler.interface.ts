@@ -4,6 +4,20 @@ export interface FocusPoint {
   explanation?: string;
 }
 
+export interface SchemaField {
+  type: 'string' | 'number' | 'float' | 'array' | 'object';
+  items?: {
+    [key: string]: SchemaField;
+  };
+  properties?: {
+    [key: string]: SchemaField;
+  };
+}
+
+export interface Schema {
+  [key: string]: SchemaField;
+}
+
 export interface CrawlerTask {
   url: string;
   recursiveConfig?: {
@@ -12,7 +26,7 @@ export interface CrawlerTask {
     urlPattern?: string;
     excludePattern?: string;
   };
-  focusPoints?: FocusPoint[];
+  schema?: Schema;
 }
 
 export interface ExtractedInfo {
@@ -20,10 +34,7 @@ export interface ExtractedInfo {
   author: string;
   publishDate: string;
   screenshot: string;
-  items: Array<{
-    tag: string;
-    content: string;
-  }>;
+  data: any;
   relatedUrls: string[];
   depth?: number;
 }

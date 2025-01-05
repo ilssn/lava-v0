@@ -1,16 +1,21 @@
-import { IsString, IsOptional, IsNumber, ValidateNested, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsNumber, ValidateNested, IsObject, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class FocusPointDto {
-  @IsString()
-  id: string;
+export class SchemaFieldDto {
+  @IsEnum(['string', 'number', 'float', 'array', 'object'])
+  type: 'string' | 'number' | 'float' | 'array' | 'object';
 
-  @IsString()
-  focuspoint: string;
-
-  @IsString()
   @IsOptional()
-  explanation?: string;
+  @IsObject()
+  items?: {
+    [key: string]: SchemaFieldDto;
+  };
+
+  @IsOptional()
+  @IsObject()
+  properties?: {
+    [key: string]: SchemaFieldDto;
+  };
 }
 
 export class RecursiveConfigDto {
@@ -40,8 +45,8 @@ export class CrawlerTaskDto {
   recursiveConfig?: RecursiveConfigDto;
 
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => FocusPointDto)
-  focusPoints?: FocusPointDto[];
+  @IsObject()
+  schema?: {
+    [key: string]: SchemaFieldDto;
+  };
 } 

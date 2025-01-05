@@ -198,10 +198,8 @@ export class CrawlerService {
 
             const textContent = $('body').text();
 
-            const [extractedContent, authorAndDate] = await Promise.all([
-              task.focusPoints
-                ? extractorService.extractContent(textContent, task.focusPoints)
-                : Promise.resolve([]),
+            const [extractedData, authorAndDate] = await Promise.all([
+              extractorService.extractStructuredData(textContent, task.schema),
               extractorService.extractAuthorAndDate(textContent),
             ]);
 
@@ -214,13 +212,11 @@ export class CrawlerService {
             }
 
             // 获取相关链接
-            const relatedUrls = task.focusPoints
-              ? await extractorService.extractRelatedLinks(
-                textContent,
-                links,
-                task.focusPoints,
-              )
-              : [];
+            const relatedUrls = await extractorService.extractRelatedLinks(
+              textContent,
+              links,
+              task.schema
+            );
 
             // 如果还没有达到最大深度，将符合条件的链接加入队列
             if (depth < (task.recursiveConfig?.maxDepth || 0)) {
@@ -248,10 +244,7 @@ export class CrawlerService {
               author: authorAndDate.source,
               publishDate: authorAndDate.publish_date,
               screenshot: screenshotUrl,
-              items: extractedContent.map((item: any) => ({
-                tag: item.focus,
-                content: item.content,
-              })),
+              data: extractedData,
               relatedUrls,
               depth,
             };
