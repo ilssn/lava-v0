@@ -142,39 +142,33 @@ export class CrawlerService {
       const requestQueue = await RequestQueue.open(`queue-${taskId}`);
       logger.debug(`Created request queue: queue-${taskId}`);
 
+      // 添加计数器
+      let processedCount = 0;
+      const maxUrls = task.recursiveConfig?.maxUrls || 1;
+
       const crawler = new PlaywrightCrawler({
-        maxRequestsPerCrawl: task.recursiveConfig?.maxUrls || 1,
+        maxRequestsPerCrawl: maxUrls,
         maxRequestRetries: 2,
-        requestHandlerTimeoutSecs: 20,
+        requestHandlerTimeoutSecs: 60,  // 增加超时时间
         headless: true,
-        navigationTimeoutSecs: 20,
+        navigationTimeoutSecs: 60,  // 增加超时时间
         browserPoolOptions: {
           useFingerprints: false,
         },
         // 使用创建的请求队列
         requestQueue,
         // 配置基本选项
-        maxConcurrency: 4,
-        // 禁用会话池
-        useSessionPool: false,
-        persistCookiesPerSession: false,
-        // 配置请求处理
-        minConcurrency: 2,
-        maxRequestsPerMinute: 40,
+        maxConcurrency: 2,  // 减少并发
+        minConcurrency: 1,
+        maxRequestsPerMinute: 20,
         // 在处理完一个请求后暂停一下，避免过快
         requestHandler: async ({ request, page, enqueueLinks, log }) => {
           try {
+            // 增加计数器
+            processedCount++;
             const url = request.url;
             const depth = request.userData.depth || 0;
-            const processedUrls = this.getProcessedUrls(taskId);
-
-            // 如果URL已经处理过，跳过
-            if (processedUrls.has(url)) {
-              return;
-            }
-            processedUrls.add(url);
-
-            log.info(`Processing URL: ${request.url}`);
+            log.info(`Processing URL: ${url} at depth ${depth} (${processedCount}/${maxUrls})`);
 
             this.logger.debug(`Current depth: ${depth}, URL: ${url}, Request ID: ${request.id}`);
             this.logger.debug(`Request userData: ${JSON.stringify(request.userData)}`);
@@ -197,57 +191,51 @@ export class CrawlerService {
             const content = await page.content();
             const $ = cheerio.load(content);
 
-            // 提取页面中的所有链接，优化选择器
+            // 提取页面中的所有链接
             const links: LinkInfo[] = [];
             $('a[href]').each((_, element) => {
-              const $element = $(element);
-              const href = $element.attr('href');
-              const text = $element.text().trim();
-
+              const href = $(element).attr('href');
               if (href) {
                 try {
                   const fullUrl = new URL(href, url).href;
-                  // 如果有URL模式，检查是否匹配
-                  if (!task.recursiveConfig?.urlPattern ||
-                    new RegExp(task.recursiveConfig.urlPattern).test(fullUrl)) {
-
-                    // 收集链接的上下文信息
-                    const $parent = $element.parent();
-                    const $siblings = $parent.children().not(element);
-                    const headings: string[] = [];
-
-                    // 收集所在区域的标题层级，限制向上查找的层级
-                    let $current = $element;
-                    let level = 0;
-                    while ($current.length && level < 3) {
-                      const $heading = $current.prevAll('h1,h2,h3,h4,h5,h6').first();
-                      if ($heading.length) {
-                        headings.unshift($heading.text().trim());
-                      }
-                      $current = $current.parent();
-                      level++;
+                  log.debug(`Processing link: ${fullUrl}`);
+                  
+                  // 统一使用 urlFilters 进行过滤
+                  if (task.recursiveConfig?.urlFilters) {
+                    const { include, exclude, articlePattern } = task.recursiveConfig.urlFilters;
+                    
+                    // 检查域名包含规则
+                    if (include && !include.some(pattern => fullUrl.includes(pattern))) {
+                      log.debug(`Link ${fullUrl} excluded: not in include patterns`);
+                      return;
                     }
-
-                    // 构建链接信息
-                    const linkInfo: LinkInfo = {
-                      url: fullUrl,
-                      title: text,
-                      description: $element.attr('title') || $element.attr('aria-label'),
-                      attributes: element.attribs,
-                      context: {
-                        parentText: $parent.clone().children().remove().end().text().trim(),
-                        siblingText: $siblings.text().trim(),
-                        headings: headings.length > 0 ? headings : undefined
-                      }
-                    };
-
-                    links.push(linkInfo);
+                    
+                    // 检查排除规则
+                    if (exclude && exclude.some(pattern => fullUrl.includes(pattern))) {
+                      log.debug(`Link ${fullUrl} excluded: matched exclude patterns`);
+                      return;
+                    }
+                    
+                    // 检查文章模式
+                    if (articlePattern && !new RegExp(articlePattern).test(fullUrl)) {
+                      log.debug(`Link ${fullUrl} excluded: not matched article pattern`);
+                      return;
+                    }
                   }
+
+                  links.push({
+                    url: fullUrl,
+                    title: $(element).text().trim()
+                  });
+                  
+                  log.debug(`Added valid link: ${fullUrl}`);
                 } catch (e) {
-                  this.logger.debug(`Invalid URL: ${href}`);
+                  log.debug(`Invalid URL: ${href}, Error: ${e.message}`);
                 }
               }
             });
+
+            log.info(`Found ${links.length} valid links on page ${url}`);
 
             const textContent = $('body').text();
 
@@ -266,7 +254,7 @@ export class CrawlerService {
             const relatedUrls = await extractorService.extractRelatedLinks(links, task.target, task.schema);
             const uniqueUrls = [...new Set(relatedUrls)].filter(url => {
               // 如果URL已经处理过，跳过
-              if (processedUrls.has(url)) {
+              if (this.getProcessedUrls(taskId).has(url)) {
                 return false;
               }
 
@@ -301,19 +289,28 @@ export class CrawlerService {
             // 如果还没有达到最大深度，将符合条件的链接加入队列
             if (depth < (task.recursiveConfig?.maxDepth || 0)) {
               if (uniqueUrls.length > 0) {
-                // 将新的URL添加到已处理集合
-                uniqueUrls.forEach(url => processedUrls.add(url));
+                // 检查是否还能添加更多URL
+                const remainingSlots = maxUrls - processedCount;
+                if (remainingSlots > 0) {
+                  const urlsToAdd = uniqueUrls.slice(0, remainingSlots);
+                  log.info(`Adding ${urlsToAdd.length} URLs to queue (${remainingSlots} slots remaining)`);
+                  
+                  // 将新的URL添加到已处理集合
+                  urlsToAdd.forEach(url => this.getProcessedUrls(taskId).add(url));
 
-                await enqueueLinks({
-                  urls: uniqueUrls,
-                  userData: { depth: depth + 1 },
-                  label: 'detail',
-                  transformRequestFunction: (request) => {
-                    request.userData = { ...request.userData, depth: depth + 1 };
-                    return request;
-                  },
-                });
-                this.logger.debug(`Enqueued ${uniqueUrls.length} unique URLs at depth ${depth + 1}`);
+                  await enqueueLinks({
+                    urls: urlsToAdd,
+                    userData: { depth: depth + 1 },
+                    label: 'detail',
+                    transformRequestFunction: (request) => {
+                      request.userData = { ...request.userData, depth: depth + 1 };
+                      return request;
+                    },
+                  });
+                  this.logger.debug(`Enqueued ${urlsToAdd.length} URLs at depth ${depth + 1}`);
+                } else {
+                  log.info('Reached maximum URLs limit, skipping additional URLs');
+                }
               }
             }
 
@@ -374,8 +371,9 @@ export class CrawlerService {
       });
 
       try {
-        // 直接运行爬虫，不需要提前teardown
+        // 直接运行爬虫，使用初始URL
         await crawler.run([task.url]);
+        logger.debug('Crawler finished running');
       } finally {
         try {
           // 在finally块中尝试清理资源

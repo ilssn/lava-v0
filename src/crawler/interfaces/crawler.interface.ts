@@ -34,8 +34,6 @@ export interface Schema {
 export interface RecursiveConfig {
   maxDepth: number;
   maxUrls?: number;
-  urlPattern?: string;
-  excludePattern?: string;
   // 链接筛选规则
   urlFilters?: {
     include?: string[];  // 包含这些字符串的链接会被保留
