@@ -115,17 +115,18 @@ export class CrawlerService {
       try {
         logger.debug('Purging default storages...');
         await purgeDefaultStorages();
-        // 确保存储目录是干净的
+
+        // 确保存储目录存在
         const storageDir = path.join(process.cwd(), 'storage');
-        logger.debug('Removing request queues directory...');
-        await fs.rm(path.join(storageDir, 'request_queues'), { recursive: true, force: true });
-        logger.debug('Removing key value stores directory...');
-        await fs.rm(path.join(storageDir, 'key_value_stores'), { recursive: true, force: true });
-        logger.debug('Removing default datasets directory...');
-        await fs.rm(path.join(storageDir, 'datasets', 'default'), { recursive: true, force: true });
-        logger.debug('Storage cleanup completed');
+        await fs.mkdir(path.join(storageDir, 'key_value_stores', 'default'), { recursive: true });
+
+        // 创建默认的 SDK 会话池状态文件
+        const sessionPoolPath = path.join(storageDir, 'key_value_stores', 'default', 'SDK_SESSION_POOL_STATE.json');
+        await fs.writeFile(sessionPoolPath, JSON.stringify({ sessions: [] }));
+
+        logger.debug('Storage initialization completed');
       } catch (error) {
-        this.logger.warn(`Error cleaning storages: ${error.message}`);
+        this.logger.warn(`Error during storage initialization: ${error.message}`);
       }
 
       // 等待一段时间确保清理完成
@@ -199,23 +200,23 @@ export class CrawlerService {
                 try {
                   const fullUrl = new URL(href, url).href;
                   log.debug(`Processing link: ${fullUrl}`);
-                  
+
                   // 统一使用 urlFilters 进行过滤
                   if (task.recursiveConfig?.urlFilters) {
                     const { include, exclude, articlePattern } = task.recursiveConfig.urlFilters;
-                    
+
                     // 检查域名包含规则
                     if (include && !include.some(pattern => fullUrl.includes(pattern))) {
                       log.debug(`Link ${fullUrl} excluded: not in include patterns`);
                       return;
                     }
-                    
+
                     // 检查排除规则
                     if (exclude && exclude.some(pattern => fullUrl.includes(pattern))) {
                       log.debug(`Link ${fullUrl} excluded: matched exclude patterns`);
                       return;
                     }
-                    
+
                     // 检查文章模式
                     if (articlePattern && !new RegExp(articlePattern).test(fullUrl)) {
                       log.debug(`Link ${fullUrl} excluded: not matched article pattern`);
@@ -227,7 +228,7 @@ export class CrawlerService {
                     url: fullUrl,
                     title: $(element).text().trim()
                   });
-                  
+
                   log.debug(`Added valid link: ${fullUrl}`);
                 } catch (e) {
                   log.debug(`Invalid URL: ${href}, Error: ${e.message}`);
@@ -294,7 +295,7 @@ export class CrawlerService {
                 if (remainingSlots > 0) {
                   const urlsToAdd = uniqueUrls.slice(0, remainingSlots);
                   log.info(`Adding ${urlsToAdd.length} URLs to queue (${remainingSlots} slots remaining)`);
-                  
+
                   // 将新的URL添加到已处理集合
                   urlsToAdd.forEach(url => this.getProcessedUrls(taskId).add(url));
 
@@ -377,7 +378,7 @@ export class CrawlerService {
       } finally {
         try {
           // 在finally块中尝试清理资源
-          await crawler.teardown();
+          // await crawler.teardown();
 
           // 清理请求队列
           logger.debug(`Destroying request queue: queue-${taskId}`);
@@ -387,7 +388,7 @@ export class CrawlerService {
           logger.debug('Cleaning up task storage...');
           const storageDir = path.join(process.cwd(), 'storage');
           await fs.rm(path.join(storageDir, 'request_queues', `queue-${taskId}`), { recursive: true, force: true });
-          await fs.rm(path.join(storageDir, 'key_value_stores', `queue-${taskId}`), { recursive: true, force: true });
+          // await fs.rm(path.join(storageDir, 'key_value_stores', `queue-${taskId}`), { recursive: true, force: true });
         } catch (error) {
           this.logger.warn(`Error during cleanup: ${error.message}`);
         }
