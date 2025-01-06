@@ -66,6 +66,7 @@ export class ExtractorService {
       const prompt = STRUCTURED_DATA_EXTRACTION_PROMPT
         .replace('{schema}', JSON.stringify(schema || this.defaultSchema, null, 2))
         .replace('{text}', text);
+      this.logger.debug('AI Extract Data Schema: %s', schema);
 
       this.logger.debug('Calling AI model for structured data extraction');
       const response = await this.callModel(prompt);

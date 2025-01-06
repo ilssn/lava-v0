@@ -253,7 +253,7 @@ export class CrawlerService {
 
             // 获取相关链接并去重
             const relatedUrls = await extractorService.extractRelatedLinks(links, task.target, task.schema);
-            const uniqueUrls = [...new Set(relatedUrls)].filter(url => {
+            const uniqueUrls = Array.from(new Set(relatedUrls)).filter(url => {
               // 如果URL已经处理过，跳过
               if (this.getProcessedUrls(taskId).has(url)) {
                 return false;
