@@ -10,10 +10,14 @@ import {
 import { CrawlerService } from './crawler.service';
 import { CrawlerResponse } from './interfaces/crawler.interface';
 import { CrawlerTaskDto } from './dto/crawler-task.dto';
+import { SchemaService } from '../ai/schema.service';
 
 @Controller('crawler')
 export class CrawlerController {
-  constructor(private readonly crawlerService: CrawlerService) { }
+  constructor(
+    private readonly crawlerService: CrawlerService,
+    private readonly schemaService: SchemaService
+  ) { }
 
   @Post('task')
   async createTask(@Body() task: CrawlerTaskDto): Promise<{ taskId: string }> {
@@ -35,5 +39,10 @@ export class CrawlerController {
       throw new HttpException('Task not found', HttpStatus.NOT_FOUND);
     }
     return status;
+  }
+
+  @Post('generate-schema')
+  async generateSchema(@Body('description') description: string): Promise<any> {
+    return this.schemaService.generateSchemaFromDescription(description);
   }
 } 

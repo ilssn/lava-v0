@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { AIService } from './ai.service';
 import { Schema } from '../crawler/interfaces/crawler.interface';
 import {
   STRUCTURED_DATA_EXTRACTION_PROMPT,
@@ -11,7 +11,6 @@ import { LinkInfo } from '../crawler/interfaces/crawler.interface';
 @Injectable()
 export class ExtractorService {
   private readonly logger = new Logger(ExtractorService.name);
-  private readonly openai: OpenAI;
   private readonly defaultSchema: Schema = {
     title: { type: 'string' },
     content: { type: 'string' },
@@ -29,35 +28,11 @@ export class ExtractorService {
     }
   };
 
-  constructor(private configService: ConfigService) {
-    const config = this.configService.get('config');
-
-    this.logger.debug('Initializing OpenAI configuration');
-    this.logger.debug(`Base URL: ${config.openai.baseUrl}`);
-    this.logger.debug(`Primary Model: ${config.openai.model}`);
-    this.logger.debug(`Secondary Model: ${config.openai.secondaryModel}`);
-
-    this.openai = this.createOpenAIInstance();
-  }
-
-  private createOpenAIInstance() {
-    return new OpenAI({
-      apiKey: this.configService.get('config').openai.apiKey,
-      baseURL: this.configService.get('config').openai.baseUrl,
-      defaultHeaders: {
-        'Content-Type': 'application/json'
-      }
-    });
-  }
+  constructor(private readonly aiService: AIService, private configService: ConfigService) { }
 
   private async callModel(prompt: string, useSecondaryModel = false) {
     const config = this.configService.get('config');
-    const response = await this.openai.chat.completions.create({
-      model: useSecondaryModel ? config.openai.secondaryModel : config.openai.model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-    });
-    return response.choices[0].message.content || '';
+    return this.aiService.callModelWithConfig(prompt, useSecondaryModel, config);
   }
 
   async extractStructuredData(text: string, schema?: Schema) {
