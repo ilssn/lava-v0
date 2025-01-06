@@ -96,12 +96,16 @@ export class ExtractorService {
       const response = await this.callModel(prompt, true);
 
       this.logger.debug('Parsing AI response');
+      let parsedLinks;
       try {
-        return JSON.parse(response);
+        parsedLinks = JSON.parse(response);
       } catch (parseError) {
         this.logger.error(`Failed to parse AI response: ${response}`);
         return [];
       }
+
+      // Remove duplicate links
+      return Array.from(new Set(parsedLinks));
     } catch (error) {
       this.logger.error(`Error extracting related links: ${error.message}`);
       throw error;
