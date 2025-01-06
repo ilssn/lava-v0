@@ -375,6 +375,18 @@ export class CrawlerService {
         // 直接运行爬虫，使用初始URL
         await crawler.run([task.url]);
         logger.debug('Crawler finished running');
+
+        // Ensure all asynchronous operations are completed before cleanup
+        await Promise.all([requestQueue.drop(),
+        fs.rm(path.join(process.cwd(), 'storage', 'request_queues', `queue-${taskId}`), { recursive: true, force: true })
+        ]);
+
+        // If a teardown method is available, use it
+        if (typeof crawler.teardown === 'function') {
+          await crawler.teardown();
+        }
+
+        logger.debug('Resources cleaned up successfully');
       } finally {
         try {
           // 在finally块中尝试清理资源
