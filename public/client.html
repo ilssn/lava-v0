@@ -499,42 +499,42 @@
         // JSON预览
         const jsonStr = JSON.stringify(results, null, 2);
         previewElement.innerHTML = `
-                    <textarea class="w-full h-full font-mono text-sm text-gray-600 bg-gray-50 p-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" readonly>${jsonStr}</textarea>
-                `;
+          <textarea class="w-full h-full font-mono text-sm text-gray-600 bg-gray-50 p-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" readonly>${jsonStr}</textarea>
+        `;
       } else {
         // 卡片视图
         previewElement.innerHTML = results.map(result => `
-                    <div class="data-card bg-white">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="flex-1">
-                                <div class="text-sm text-gray-500 mb-1">URL</div>
-                                <div class="text-gray-900 break-all">${result.url}</div>
-                            </div>
-                            <div class="ml-4">
-                                <div class="text-sm text-gray-500 mb-1">深度</div>
-                                <div class="text-gray-900">${result.depth || 0}</div>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <div class="text-sm text-gray-500 mb-1">作者</div>
-                                <div class="text-gray-900">${result.author || '未知'}</div>
-                            </div>
-                            <div>
-                                <div class="text-sm text-gray-500 mb-1">发布日期</div>
-                                <div class="text-gray-900">${result.publishDate || '未知'}</div>
-                            </div>
-                        </div>
-                        <div class="space-y-4">
-                            ${Object.keys(result.data).map(key => `
-                                <div class="mb-2">
-                                    <div class="text-sm text-purple-600">${key}</div>
-                                    <div class="text-gray-700">${result.data[key]}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `).join('');
+          <div class="data-card bg-white">
+            <div class="flex justify-between items-start mb-4">
+              <div class="flex-1">
+                <div class="text-sm text-gray-500 mb-1">URL</div>
+                <div class="text-gray-900 break-all">${result.url}</div>
+              </div>
+              <div class="ml-4">
+                <div class="text-sm text-gray-500 mb-1">深度</div>
+                <div class="text-gray-900">${result.depth || 0}</div>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <div class="text-sm text-gray-500 mb-1">作者</div>
+                <div class="text-gray-900">${result.author || '未知'}</div>
+              </div>
+              <div>
+                <div class="text-sm text-gray-500 mb-1">发布日期</div>
+                <div class="text-gray-900">${result.publishDate || '未知'}</div>
+              </div>
+            </div>
+            <div class="space-y-4">
+              ${Object.entries(result.data).map(([key, value]) => `
+                <div class="bg-gray-50 p-4 rounded-md">
+                  <div class="text-sm text-purple-600 mb-2">${key}</div>
+                  <div class="text-gray-700">${typeof value === 'object' ? JSON.stringify(value, null, 2) : value}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
       }
     }
 
@@ -545,31 +545,31 @@
       if (currentScreenshotMode === 'latest' && results.length > 0) {
         const latestResult = results[results.length - 1];
         previewElement.innerHTML = `
-                    <div class="h-full flex flex-col">
-                        <img src="${latestResult.screenshot}" class="flex-grow object-contain rounded-lg fade-in h-[calc(100%-24px)]">
-                        <div class="mt-2 text-sm text-gray-500 flex-none">最新截图 - ${latestResult.url}</div>
-                    </div>
-                `;
+          <div class="h-full flex flex-col">
+            <img src="${latestResult.screenshot}" class="flex-grow object-contain rounded-lg fade-in h-[calc(100%-24px)]">
+            <div class="mt-2 text-sm text-gray-500 flex-none">最新截图 - ${latestResult.url}</div>
+          </div>
+        `;
       } else if (results.length > 0) {
         previewElement.innerHTML = `
-                    <div class="grid grid-cols-2 gap-4 h-full">
-                        ${results.map(result => `
-                            <div class="relative group h-full">
-                                <img src="${result.screenshot}" class="w-full h-full object-cover rounded-lg fade-in">
-                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all rounded-lg"></div>
-                                <div class="absolute bottom-0 left-0 right-0 p-2 bg-black bg-opacity-50 text-white text-xs rounded-b-lg opacity-0 group-hover:opacity-100 transition-all">
-                                    ${result.url}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
+          <div class="grid grid-cols-2 gap-4 h-full">
+            ${results.map(result => `
+              <div class="relative group h-full">
+                <img src="${result.screenshot}" class="w-full h-full object-cover rounded-lg fade-in">
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all rounded-lg"></div>
+                <div class="absolute bottom-0 left-0 right-0 p-2 bg-black bg-opacity-50 text-white text-xs rounded-b-lg opacity-0 group-hover:opacity-100 transition-all">
+                  ${result.url}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
       } else {
         previewElement.innerHTML = `
-                    <div class="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                        <span class="text-gray-500">暂无截图</span>
-                    </div>
-                `;
+          <div class="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+            <span class="text-gray-500">暂无截图</span>
+          </div>
+        `;
       }
     }
 
@@ -591,15 +591,15 @@
 
       // 重置截图预览
       document.getElementById('screenshotPreview').innerHTML = `
-                <div class="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                    <span class="text-gray-500">暂无截图</span>
-                </div>
-            `;
+        <div class="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+          <span class="text-gray-500">暂无截图</span>
+        </div>
+      `;
 
       // 重置数据预览
       document.getElementById('dataPreview').innerHTML = `
-                <pre class="text-sm text-gray-600">暂无数据</pre>
-            `;
+        <pre class="text-sm text-gray-600">暂无数据</pre>
+      `;
 
       // 重置关注点
       const focusPoints = document.getElementById('focusPoints');
@@ -645,26 +645,26 @@
       // 根据当前模式调整全屏显示的样式
       if (currentScreenshotMode === 'latest') {
         content.innerHTML = `
-                    <div class="max-w-6xl mx-auto">
-                        ${currentContent}
-                    </div>
-                `;
+          <div class="max-w-6xl mx-auto">
+            ${currentContent}
+          </div>
+        `;
       } else {
         // 网格布局时调整样式
         content.innerHTML = `
-                    <div class="max-w-6xl mx-auto">
-                        <div class="grid grid-cols-2 gap-8">
-                            ${allScreenshots.map(result => `
-                                <div class="relative group">
-                                    <img src="${result.screenshot}" class="w-full rounded-lg shadow-lg fade-in">
-                                    <div class="absolute bottom-0 left-0 right-0 p-3 bg-black bg-opacity-50 text-white text-sm rounded-b-lg">
-                                        ${result.url}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
+          <div class="max-w-6xl mx-auto">
+            <div class="grid grid-cols-2 gap-8">
+              ${allScreenshots.map(result => `
+                <div class="relative group">
+                  <img src="${result.screenshot}" class="w-full rounded-lg shadow-lg fade-in">
+                  <div class="absolute bottom-0 left-0 right-0 p-3 bg-black bg-opacity-50 text-white text-sm rounded-b-lg">
+                    ${result.url}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
       }
 
       modal.classList.remove('hidden');
