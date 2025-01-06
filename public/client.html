@@ -148,20 +148,41 @@
                 class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
             </div>
 
-            <!-- 关注点设置 -->
+            <!-- 任务描述 -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">关注点设置</label>
-              <div id="focusPoints" class="space-y-4">
-                <!-- 关注点将通过JS动态添加 -->
-              </div>
-              <button type="button" id="addFocusPoint"
-                class="w-full mt-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span>添加关注点</span>
+              <label class="block text-sm font-medium text-gray-700 mb-2">任务描述</label>
+              <input type="text" id="taskDescription" placeholder="输入任务描述以生成Schema"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+              <button type="button" id="generateSchema"
+                class="w-full mt-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2">
+                <span>生成Schema</span>
               </button>
+            </div>
+
+            <!-- 模式切换按钮 -->
+            <div class="flex gap-4 mb-4">
+              <button type="button" id="jsonMode"
+                class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">JSON模式</button>
+              <button type="button" id="formMode"
+                class="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors">表单模式</button>
+            </div>
+
+            <!-- JSON输入 -->
+            <div id="jsonInputContainer">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Schema (JSON)</label>
+              <textarea id="schemaInput" rows="10"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="输入或生成的Schema"></textarea>
+            </div>
+
+            <!-- 表单输入 -->
+            <div id="formInputContainer" class="hidden">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Schema (表单)</label>
+              <div id="formSchema" class="space-y-4">
+                <!-- 动态添加表单字段 -->
+              </div>
+              <button type="button" id="addField"
+                class="w-full mt-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">添加字段</button>
             </div>
 
             <!-- 提交按钮 -->
@@ -314,88 +335,14 @@
 
     // 初始化页面
     document.addEventListener('DOMContentLoaded', () => {
-      addFocusPoint();
       const form = document.getElementById('crawlerForm');
       form.addEventListener('submit', handleSubmit);
       form.addEventListener('reset', handleReset);
-      document.getElementById('addFocusPoint').addEventListener('click', addFocusPoint);
+      document.getElementById('generateSchema').addEventListener('click', generateSchema);
     });
-
-    // 添加关注点
-    function addFocusPoint() {
-      const container = document.getElementById('focusPoints');
-      const focusPointId = `focusPoint${container.children.length + 1}`;
-
-      const focusPointHtml = `
-                <div class="focus-point bg-gray-50 p-4 rounded-md relative group">
-                    <button type="button" onclick="removeFocusPoint(this.parentElement)" 
-                        class="absolute right-2 top-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                        ×
-                    </button>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">ID</label>
-                            <input type="text" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">关注点</label>
-                            <input type="text" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">说明</label>
-                        <input type="text"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    </div>
-                </div>
-            `;
-
-      const div = document.createElement('div');
-      div.innerHTML = focusPointHtml;
-      container.appendChild(div.firstElementChild);
-    }
-
-    // 切换截图模式
-    function switchScreenshotMode(mode) {
-      currentScreenshotMode = mode;
-      document.querySelectorAll('.screenshot-tab').forEach(tab => {
-        tab.classList.remove('tab-active');
-      });
-      event.target.classList.add('tab-active');
-      updateScreenshotPreview(allScreenshots);
-    }
-
-    // 切换数据模式
-    function switchDataMode(mode) {
-      currentDataMode = mode;
-      document.querySelectorAll('.data-tab').forEach(tab => {
-        tab.classList.remove('tab-active');
-      });
-      event.target.classList.add('tab-active');
-      if (currentTaskId) {
-        checkTaskStatus();
-      }
-    }
-
-    // 移除关注点
-    function removeFocusPoint(element) {
-      element.remove();
-    }
 
     // 收集表单数据
     function collectFormData() {
-      const focusPoints = [];
-      document.querySelectorAll('.focus-point').forEach(point => {
-        const inputs = point.querySelectorAll('input');
-        focusPoints.push({
-          id: inputs[0].value,
-          focuspoint: inputs[1].value,
-          explanation: inputs[2].value
-        });
-      });
-
       return {
         url: document.getElementById('url').value,
         recursiveConfig: {
@@ -403,7 +350,7 @@
           maxUrls: parseInt(document.getElementById('maxUrls').value),
           urlPattern: document.getElementById('urlPattern').value || undefined
         },
-        focusPoints
+        schema: JSON.parse(document.getElementById('schemaInput').value)
       };
     }
 
@@ -740,6 +687,168 @@
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 300);
       }, 2000);
+    }
+
+    // 生成Schema
+    async function generateSchema() {
+      const description = document.getElementById('taskDescription').value;
+      if (!description) return alert('请输入任务描述');
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/crawler/generate-schema`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            description
+          })
+        });
+
+        const schema = await response.json();
+        document.getElementById('schemaInput').value = JSON.stringify(schema, null, 2);
+      } catch (error) {
+        console.error('Error generating schema:', error);
+        alert('生成Schema失败，请重试');
+      }
+    }
+
+    // 渲染基础控件
+    function renderBasicField(key, field) {
+      return `
+        <div class="flex gap-4 items-center">
+          <input type="text" value="${key}" placeholder="字段名" class="flex-1 px-3 py-2 border border-gray-300 rounded-md">
+          <select class="flex-1 px-3 py-2 border border-gray-300 rounded-md">
+            <option value="string" ${field.type === 'string' ? 'selected' : ''}>String</option>
+            <option value="number" ${field.type === 'number' ? 'selected' : ''}>Number</option>
+          </select>
+          <input type="text" value="${field.description || ''}" placeholder="字段描述" class="flex-1 px-3 py-2 border border-gray-300 rounded-md">
+          <button type="button" onclick="removeField(this)" class="text-red-500">删除</button>
+        </div>
+      `;
+    }
+
+    // 渲染嵌套控件
+    function renderNestedField(key, field, container) {
+      const div = document.createElement('div');
+      div.innerHTML = renderBasicField(key, field);
+      container.appendChild(div.firstElementChild);
+
+      if (field.type === 'object' && field.properties) {
+        const nestedContainer = document.createElement('div');
+        nestedContainer.classList.add('ml-6', 'border-l', 'pl-4', 'mt-2');
+        div.appendChild(nestedContainer);
+        for (const subKey in field.properties) {
+          renderNestedField(subKey, field.properties[subKey], nestedContainer);
+        }
+        const addSubFieldButton = document.createElement('button');
+        addSubFieldButton.textContent = '添加子字段';
+        addSubFieldButton.className =
+          'mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors';
+        addSubFieldButton.onclick = () => addField(nestedContainer);
+        div.appendChild(addSubFieldButton);
+      } else if (field.type === 'array' && field.items) {
+        const nestedContainer = document.createElement('div');
+        nestedContainer.classList.add('ml-6', 'border-l', 'pl-4', 'mt-2');
+        div.appendChild(nestedContainer);
+        renderNestedField('item', field.items, nestedContainer);
+      }
+    }
+
+    // 解析 JSON 为表单
+    function parseJsonToForm(json, container) {
+      container.innerHTML = '';
+      for (const key in json) {
+        const field = json[key];
+        if (field.type === 'string' || field.type === 'number') {
+          container.innerHTML += renderBasicField(key, field);
+        } else if (field.type === 'array') {
+          renderNestedField(key, field, container);
+        }
+        // Skip rendering for 'object' type but preserve data
+      }
+    }
+
+    // 序列化表单为 JSON
+    function serializeFormToJson(container) {
+      const json = {};
+      Array.from(container.children).forEach(div => {
+        const inputs = div.querySelectorAll('input, select');
+        const key = inputs[0].value.trim();
+        const type = inputs[1].value;
+        const description = inputs[2] ? inputs[2].value.trim() : '';
+        if (!key) return; // Skip empty keys
+        const field = {
+          type
+        };
+        if (description) field.description = description;
+
+        console.log(`Serializing field: ${key}, type: ${type}, description: ${description}`); // Debugging
+
+        if (type === 'object') {
+          const nestedContainer = div.querySelector('div');
+          if (nestedContainer) {
+            field.properties = serializeFormToJson(nestedContainer);
+          }
+        } else if (type === 'array') {
+          const nestedContainer = div.querySelector('div');
+          if (nestedContainer) {
+            field.items = serializeFormToJson(nestedContainer).item;
+          }
+        }
+
+        json[key] = field;
+      });
+      console.log('Serialized JSON:', json); // Debugging
+      return json;
+    }
+
+    // 更新模式切换逻辑
+    function switchToJsonMode() {
+      const formContainer = document.getElementById('formSchema');
+      const json = serializeFormToJson(formContainer);
+      document.getElementById('schemaInput').value = JSON.stringify(json, null, 2);
+      document.getElementById('jsonInputContainer').classList.remove('hidden');
+      document.getElementById('formInputContainer').classList.add('hidden');
+    }
+
+    function switchToFormMode() {
+      const json = JSON.parse(document.getElementById('schemaInput').value || '{}');
+      const formContainer = document.getElementById('formSchema');
+      parseJsonToForm(json, formContainer);
+      document.getElementById('jsonInputContainer').classList.add('hidden');
+      document.getElementById('formInputContainer').classList.remove('hidden');
+    }
+
+    document.getElementById('jsonMode').addEventListener('click', switchToJsonMode);
+    document.getElementById('formMode').addEventListener('click', switchToFormMode);
+
+    // 动态添加表单字段
+    function addField() {
+      const container = document.getElementById('formSchema');
+      const fieldHtml = `
+        <div class="flex gap-4 items-center">
+          <input type="text" placeholder="字段名" class="flex-1 px-3 py-2 border border-gray-300 rounded-md">
+          <select class="flex-1 px-3 py-2 border border-gray-300 rounded-md">
+            <option value="string">String</option>
+            <option value="number">Number</option>
+            <option value="array">Array</option>
+            <option value="object">Object</option>
+          </select>
+          <input type="text" placeholder="字段描述" class="flex-1 px-3 py-2 border border-gray-300 rounded-md">
+          <button type="button" onclick="removeField(this)" class="text-red-500">删除</button>
+        </div>
+      `;
+      const div = document.createElement('div');
+      div.innerHTML = fieldHtml;
+      container.appendChild(div.firstElementChild);
+    }
+
+    document.getElementById('addField').addEventListener('click', addField);
+
+    // 移除字段
+    function removeField(button) {
+      button.parentElement.remove();
     }
   </script>
 </body>
