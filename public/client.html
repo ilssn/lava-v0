@@ -400,8 +400,10 @@
       try {
         const response = await fetch(`${API_BASE_URL}/crawler/task/${currentTaskId}`);
         const data = await response.json();
+        console.log('data:', data);
 
         const current = data.results && data.results.length || 0;
+        console.log('current:', current);
 
         updateTaskStatus(data.status, {
           current,
@@ -410,11 +412,13 @@
 
         if (data.results && data.results.length > 0) {
           allScreenshots = data.results;
+          console.log('allScreenshots:', allScreenshots);
           updateScreenshotPreview(data.results);
           updateDataPreview(data.results);
         }
 
         if (data.status === 'completed' || data.status === 'failed') {
+          console.log('statusCheckInterval:', statusCheckInterval);
           clearInterval(statusCheckInterval);
         }
       } catch (error) {
@@ -522,10 +526,10 @@
                             </div>
                         </div>
                         <div class="space-y-4">
-                            ${result.items.map(item => `
-                                <div class="bg-gray-50 p-4 rounded-md">
-                                    <div class="text-sm text-purple-600 mb-2">${item.tag}</div>
-                                    <div class="text-gray-700">${item.content}</div>
+                            ${Object.keys(result.data).map(key => `
+                                <div class="mb-2">
+                                    <div class="text-sm text-purple-600">${key}</div>
+                                    <div class="text-gray-700">${result.data[key]}</div>
                                 </div>
                             `).join('')}
                         </div>
@@ -864,6 +868,34 @@
       } else {
         console.error('Field container not found.');
       }
+    }
+
+    // 切换数据视图模式
+    function switchDataMode(mode) {
+      currentDataMode = mode;
+      const dataTabs = document.querySelectorAll('.data-tab');
+      dataTabs.forEach(tab => {
+        if (tab.textContent.includes(mode === 'json' ? 'JSON' : '卡片')) {
+          tab.classList.add('tab-active');
+        } else {
+          tab.classList.remove('tab-active');
+        }
+      });
+      updateDataPreview(allScreenshots);
+    }
+
+    // 切换截图视图模式
+    function switchScreenshotMode(mode) {
+      currentScreenshotMode = mode;
+      const screenshotTabs = document.querySelectorAll('.screenshot-tab');
+      screenshotTabs.forEach(tab => {
+        if (tab.textContent.includes(mode === 'all' ? '全部截图' : '最新截图')) {
+          tab.classList.add('tab-active');
+        } else {
+          tab.classList.remove('tab-active');
+        }
+      });
+      updateScreenshotPreview(allScreenshots);
     }
   </script>
 </body>
