@@ -5,32 +5,38 @@ Schema定义：{schema}
 
 请严格按照schema定义的结构提取数据，直接返回JSON格式。注意以下要求：
 
-1. 只返回JSON数据本身，不要添加任何额外的格式标记或说明文字
-2. 确保返回的是合法的JSON格式
+1. 只返回JSON数据本身，不要添加任何额外的格式标记或说明文字。
+2. 确保返回的是合法的JSON格式。
 3. 严格遵循schema中定义的数据类型和结构：
    - string: 文本字符串
    - number/float: 数字
    - array: 数组，使用itemType指定元素类型
    - object: 对象，包含指定的属性
-4. 对于嵌套的对象结构，确保正确处理每一层的属性
-5. 对于数组类型，根据itemType返回正确的元素类型
-6. 如果找不到对应的数据，对应字段返回null
-7. 字符串类型的内容如有换行，使用\\n表示
-8. 保持输出的完整性，确保所有必需的字段都存在
+4. 对于嵌套的对象结构，确保正确处理每一层的属性。
+5. 对于数组类型，根据itemType返回正确的元素类型。
+6. 如果找不到对应的数据，返回对应格式的空值, 比如字符串返回空字符串，数字返回0，数组返回空数组等。
+7. 字符串类型的内容如有换行，使用\\n表示。
+8. 保持输出的完整性，确保所有必需的字段都存在。
+9. 严格遵循schema定义的结构，不要添加任何额外的属性。
+10. 如果schema中定义了description，则按照description的描述进行提取, 包括字数限制输出格式等规范都要严格遵循。
+11. 如果提取的数据字数超过了限制，则进行概括处理，不要超过限制。
+12. 确保所有字段的值都符合schema中定义的格式和限制条件。
+13. 在提取过程中，优先考虑schema中description的要求，确保输出符合生产环境的API数据标准。
 
 示例schema:
 {
-  "summary": { "type": "string" },
+  "summary": { "type": "string", "description": "概括文章内容,不要超过50个字" },
   "metadata": {
     "type": "object",
     "properties": {
       "title": { "type": "string" },
       "author": { "type": "string" },
-      "date": { "type": "string" },
+      "date": { "type": "string", "description": "日期格式为YYYY-MM-DD" },
       "views": { "type": "number" },
       "tags": {
         "type": "array",
-        "itemType": "string"
+        "itemType": "string",
+        "description": "标签数组，每个标签不超过5个字"
       }
     }
   }
@@ -38,7 +44,7 @@ Schema定义：{schema}
 
 示例输出:
 {
-  "summary": "这是文章的内容总结",
+  "summary": "这是文章的内容总结，内容经过概括处理字数没有超过50个字",
   "metadata": {
     "title": "文章标题",
     "author": "作者名称",
