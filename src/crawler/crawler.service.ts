@@ -12,7 +12,9 @@ import {
 import { ExtractorService } from '../ai/extractor.service';
 import { UploadService } from './upload.service';
 import * as path from 'path';
-import * as fs from 'fs/promises';
+import * as fs from 'fs/promises'
+// import axios from 'axios';
+import { submitAndWait } from '../utils/crawlerUtils';
 
 @Injectable()
 export class CrawlerService {
@@ -111,34 +113,6 @@ export class CrawlerService {
       const dataDir = path.join(process.cwd(), 'storage', 'datasets', taskId);
       await fs.mkdir(dataDir, { recursive: true });
 
-      // 清理默认存储
-      try {
-        logger.debug('Purging default storages...');
-        await purgeDefaultStorages();
-
-        // 确保存储目录存在
-        const storageDir = path.join(process.cwd(), 'storage');
-        await fs.mkdir(path.join(storageDir, 'key_value_stores', 'default'), { recursive: true });
-
-        // 创建默认的 SDK 会话池状态文件
-        const sessionPoolPath = path.join(storageDir, 'key_value_stores', 'default', 'SDK_SESSION_POOL_STATE.json');
-        await fs.writeFile(sessionPoolPath, JSON.stringify({ sessions: [] }));
-
-        logger.debug('Storage initialization completed');
-      } catch (error) {
-        this.logger.warn(`Error during storage initialization: ${error.message}`);
-      }
-
-      // 等待一段时间确保清理完成
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // 重新创建必要的目录
-      logger.debug('Creating new storage directories...');
-      await fs.mkdir(dataDir, { recursive: true });
-      await fs.mkdir(path.join(process.cwd(), 'storage', 'request_queues'), { recursive: true });
-      await fs.mkdir(path.join(process.cwd(), 'storage', 'key_value_stores'), { recursive: true });
-      logger.debug('Storage directories created');
-
       // 创建唯一的请求队列
       const requestQueue = await RequestQueue.open(`queue-${taskId}`);
       logger.debug(`Created request queue: queue-${taskId}`);
@@ -147,271 +121,72 @@ export class CrawlerService {
       let processedCount = 0;
       const maxUrls = task.recursiveConfig?.maxUrls || 1;
 
-      const crawler = new PlaywrightCrawler({
-        maxRequestsPerCrawl: maxUrls,
-        maxRequestRetries: 2,
-        requestHandlerTimeoutSecs: 60,  // 增加超时时间
-        headless: true,
-        navigationTimeoutSecs: 60,  // 增加超时时间
-        browserPoolOptions: {
-          useFingerprints: false,
-        },
-        // 使用创建的请求队列
-        requestQueue,
-        // 配置基本选项
-        maxConcurrency: 2,  // 减少并发
-        minConcurrency: 1,
-        maxRequestsPerMinute: 20,
-        // 在处理完一个请求后暂停一下，避免过快
-        requestHandler: async ({ request, page, enqueueLinks, log }) => {
-          try {
-            // 增加计数器
-            processedCount++;
-            const url = request.url;
-            const depth = request.userData.depth || 0;
-            log.info(`Processing URL: ${url} at depth ${depth} (${processedCount}/${maxUrls})`);
+      // 初始URL加入队列
+      await requestQueue.addRequest({ url: task.url });
 
-            this.logger.debug(`Current depth: ${depth}, URL: ${url}, Request ID: ${request.id}`);
-            this.logger.debug(`Request userData: ${JSON.stringify(request.userData)}`);
+      while (processedCount < maxUrls) {
+        const request = await requestQueue.fetchNextRequest();
+        if (!request) break;
 
-            // 添加随机延迟，但减少等待时间
-            await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 500));
+        const url = request.url;
+        logger.log(`Processing URL: ${url} (${processedCount + 1}/${maxUrls})`);
 
-            await page.setExtraHTTPHeaders({
-              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
-            });
+        try {
+          // 获取页面信息
+          const pageInfo = await this.getPageInfo(task, url);
+          logger.debug(`Page info: ${JSON.stringify(pageInfo.data)}`);
 
-            // 减少等待时间
-            await page.waitForLoadState('domcontentloaded');
+          // 处理页面信息（例如，保存数据、截图等）
+          const pageData = pageInfo
+          // 保存页面数据到文件
+          const dataFile = path.join(dataDir, `${taskId}.json`);
 
-            // 截图
-            const screenshotPath = path.join(process.cwd(), 'storage', 'screenshots', `${taskId}-${request.id}.png`);
-            await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
-            await page.screenshot({ path: screenshotPath, fullPage: true });
+          // 在使用之前声明 currentTask
+          const currentTask = tasks.get(taskId);
+          const currentData = currentTask?.results ? [...currentTask.results, pageData] : [pageData];
+          await fs.writeFile(dataFile, JSON.stringify(currentData, null, 2), 'utf-8');
+          logger.debug(`Saved page data to ${dataFile}`);
 
-            const content = await page.content();
-            const $ = cheerio.load(content);
-
-            // 提取页面中的所有链接
-            const links: LinkInfo[] = [];
-            $('a[href]').each((_, element) => {
-              const href = $(element).attr('href');
-              if (href) {
-                try {
-                  const fullUrl = new URL(href, url).href;
-                  log.debug(`Processing link: ${fullUrl}`);
-
-                  // 统一使用 urlFilters 进行过滤
-                  if (task.recursiveConfig?.urlFilters) {
-                    const { include, exclude, articlePattern } = task.recursiveConfig.urlFilters;
-
-                    // 检查域名包含规则
-                    if (include && !include.some(pattern => fullUrl.includes(pattern))) {
-                      log.debug(`Link ${fullUrl} excluded: not in include patterns`);
-                      return;
-                    }
-
-                    // 检查排除规则
-                    if (exclude && exclude.some(pattern => fullUrl.includes(pattern))) {
-                      log.debug(`Link ${fullUrl} excluded: matched exclude patterns`);
-                      return;
-                    }
-
-                    // 检查文章模式
-                    if (articlePattern && !new RegExp(articlePattern).test(fullUrl)) {
-                      log.debug(`Link ${fullUrl} excluded: not matched article pattern`);
-                      return;
-                    }
-                  }
-
-                  links.push({
-                    url: fullUrl,
-                    title: $(element).text().trim()
-                  });
-
-                  log.debug(`Added valid link: ${fullUrl}`);
-                } catch (e) {
-                  log.debug(`Invalid URL: ${href}, Error: ${e.message}`);
-                }
-              }
-            });
-
-            log.info(`Found ${links.length} valid links on page ${url}`);
-
-            const textContent = $('body').text();
-
-            // 提取结构化数据
-            const extractedData = await extractorService.extractStructuredData(textContent, task.schema);
-
-            // 上传截图
-            let screenshotUrl = '';
-            try {
-              screenshotUrl = await uploadService.uploadImage(screenshotPath);
-            } catch (error) {
-              logger.error(`Failed to upload screenshot: ${error.message}`);
-            }
-
-            // 获取相关链接并去重
-            const relatedUrls = await extractorService.extractRelatedLinks(links, task.target, task.schema);
-            const uniqueUrls = Array.from(new Set(relatedUrls)).filter(url => {
-              // 如果URL已经处理过，跳过
-              if (this.getProcessedUrls(taskId).has(url)) {
-                return false;
-              }
-
-              // 如果没有配置过滤规则，保留所有链接
-              if (!task.recursiveConfig?.urlFilters) return true;
-
-              const { include, exclude, articlePattern } = task.recursiveConfig.urlFilters;
-
-              // 检查排除规则
-              if (exclude && exclude.some(pattern => url.includes(pattern))) {
-                return false;
-              }
-
-              // 检查包含规则
-              if (include && !include.some(pattern => url.includes(pattern))) {
-                return false;
-              }
-
-              // 检查文章模式
-              if (articlePattern) {
-                try {
-                  return new RegExp(articlePattern).test(url);
-                } catch (error) {
-                  this.logger.warn(`Invalid article pattern: ${articlePattern}`);
-                  return true;
-                }
-              }
-
-              return true;
-            });
-
-            // 如果还没有达到最大深度，将符合条件的链接加入队列
-            if (depth < (task.recursiveConfig?.maxDepth || 0)) {
-              if (uniqueUrls.length > 0) {
-                // 检查是否还能添加更多URL
-                const remainingSlots = maxUrls - processedCount;
-                if (remainingSlots > 0) {
-                  const urlsToAdd = uniqueUrls.slice(0, remainingSlots);
-                  log.info(`Adding ${urlsToAdd.length} URLs to queue (${remainingSlots} slots remaining)`);
-
-                  // 将新的URL添加到已处理集合
-                  urlsToAdd.forEach(url => this.getProcessedUrls(taskId).add(url));
-
-                  await enqueueLinks({
-                    urls: urlsToAdd,
-                    userData: { depth: depth + 1 },
-                    label: 'detail',
-                    transformRequestFunction: (request) => {
-                      request.userData = { ...request.userData, depth: depth + 1 };
-                      return request;
-                    },
-                  });
-                  this.logger.debug(`Enqueued ${urlsToAdd.length} URLs at depth ${depth + 1}`);
-                } else {
-                  log.info('Reached maximum URLs limit, skipping additional URLs');
-                }
-              }
-            }
-
-            const extractedInfo: ExtractedInfo = {
-              url,
-              author: extractedData.metadata?.author || 'NA',
-              publishDate: extractedData.metadata?.date || 'NA',
-              screenshot: screenshotUrl,
-              data: extractedData,
-              relatedUrls,
-              depth,
-            };
-
-            // 保存结果到任务特定的文件
-            const taskFile = path.join(dataDir, `${taskId}.json`);
-
-            // 读取现有结果（如果有）
-            let existingResults = [];
-            try {
-              const existingContent = await fs.readFile(taskFile, 'utf-8');
-              existingResults = JSON.parse(existingContent);
-            } catch (error) {
-              if (error.code !== 'ENOENT') {
-                this.logger.error(`Error reading existing results: ${error.message}`);
-              }
-            }
-
-            // 合并新结果
-            const updatedResults = Array.isArray(existingResults)
-              ? [...existingResults, extractedInfo]
-              : [extractedInfo];
-
-            // 保存更新后的结果
-            await fs.writeFile(taskFile, JSON.stringify(updatedResults, null, 2));
-
-            // 更新任务状态
+          // 更新任务状态中的结果
+          if (currentTask) {
+            const updatedResults = currentTask.results ? [...currentTask.results, pageData] : [pageInfo as any];
             tasks.set(taskId, {
-              taskId,
-              status: 'processing',
-              results: updatedResults,
+              ...currentTask,
+              results: updatedResults
             });
+          }
+          // ...
 
-            // 记录当前深度的处理情况
-            this.logger.debug(`Processed URL ${url} at depth ${depth}`);
+          // 从页面信息中提取相关链接
+          const relatedUrls = pageInfo.relatedUrls.internal.map(link => link.href);
 
-          } catch (error) {
-            logger.error(`Error processing URL ${request.url}: ${error.message}`);
-            if (error instanceof Error) {
-              logger.error(error.stack);
+          // 将相关链接加入队列
+          for (const relatedUrl of relatedUrls) {
+            if (!this.getProcessedUrls(taskId).has(relatedUrl)) {
+              await requestQueue.addRequest({ url: relatedUrl });
+              this.getProcessedUrls(taskId).add(relatedUrl);
             }
           }
-        },
-        failedRequestHandler({ request, log, error }) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          log.error(`Request ${request.url} failed: ${errorMessage}`);
-          logger.error(`Failed request for ${request.url}: ${errorMessage}`);
-        },
-      });
 
-      try {
-        // 直接运行爬虫，使用初始URL
-        await crawler.run([task.url]);
-        logger.debug('Crawler finished running');
-
-        // Ensure all asynchronous operations are completed before cleanup
-        await Promise.all([requestQueue.drop(),
-        fs.rm(path.join(process.cwd(), 'storage', 'request_queues', `queue-${taskId}`), { recursive: true, force: true })
-        ]);
-
-        // If a teardown method is available, use it
-        if (typeof crawler.teardown === 'function') {
-          await crawler.teardown();
-        }
-
-        logger.debug('Resources cleaned up successfully');
-      } finally {
-        try {
-          // 在finally块中尝试清理资源
-          // await crawler.teardown();
-
-          // 清理请求队列
-          logger.debug(`Destroying request queue: queue-${taskId}`);
-          await requestQueue.drop();
-
-          // 清理存储目录
-          logger.debug('Cleaning up task storage...');
-          const storageDir = path.join(process.cwd(), 'storage');
-          await fs.rm(path.join(storageDir, 'request_queues', `queue-${taskId}`), { recursive: true, force: true });
-          // await fs.rm(path.join(storageDir, 'key_value_stores', `queue-${taskId}`), { recursive: true, force: true });
+          processedCount++;
+          await requestQueue.markRequestHandled(request);
         } catch (error) {
-          this.logger.warn(`Error during cleanup: ${error.message}`);
+          logger.error(`Error processing URL ${url}: ${error.message}`);
+          await requestQueue.reclaimRequest(request);
         }
-        // 设置最终状态
-        const finalResults = this.tasks.get(taskId);
-        if (finalResults) {
-          this.tasks.set(taskId, {
-            ...finalResults,
-            status: 'completed'
-          });
-        }
+      }
+
+      // 清理请求队列
+      logger.debug(`Destroying request queue: queue-${taskId}`);
+      await requestQueue.drop();
+
+      // 设置最终状态
+      const finalResults = this.tasks.get(taskId);
+      if (finalResults) {
+        this.tasks.set(taskId, {
+          ...finalResults,
+          status: 'completed'
+        });
       }
     } catch (error) {
       this.logger.error(`Error in crawler task ${taskId}: ${error.message}`);
@@ -423,4 +198,42 @@ export class CrawlerService {
       throw error;
     }
   }
+
+  private async getPageInfo(task: CrawlerTask, currentUrl: string) {
+    this.logger.debug(`Getting page info for ${currentUrl}`);
+    const requestBody = {
+      urls: currentUrl,
+      extraction_config: {
+        type: 'llm',
+        params: {
+          provider: 'gpt-4o',
+          base_url: 'https://api.302.ai/v1',
+          api_token: 'sk-IOIhA9NVd4OVVtF8LwxsyIuJx36gxrd3VnnTtbVogROvBENs',
+          instruction: task.target,
+          extract_type: 'schema',
+          schema: task.schema
+        }
+      },
+      crawler_params: {
+        verbose: 'True'
+      }
+    };
+
+    try {
+      const { result } = await submitAndWait(requestBody);
+      this.logger.debug(`Task created: ${result}`);
+      return {
+        url: currentUrl,
+        screenshot: result.screenshot,
+        data: JSON.parse(result.extracted_content),
+        metadata: result.metadata,
+        relatedUrls: result.links,
+      }
+    } catch (error) {
+      this.logger.error(`Error creating task: ${error.message}`);
+      throw error;
+    }
+  }
+
+
 } 
