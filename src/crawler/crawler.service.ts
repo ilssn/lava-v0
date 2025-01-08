@@ -134,10 +134,18 @@ export class CrawlerService {
         try {
           // 获取页面信息
           const pageInfo = await this.getPageInfo(task, url);
-          logger.debug(`Page info: ${JSON.stringify(pageInfo.data)}`);
+          logger.debug(`Page info: ${JSON.stringify(pageInfo.screenshot)}`);
 
           // 处理页面信息（例如，保存数据、截图等）
-          const pageData = pageInfo
+          // const imageUrl = await uploadService.uploadImage(pageInfo.screenshot)
+
+          const pageData = {
+            url: pageInfo.url,
+            screenshot: pageInfo.screenshot,
+            data: pageInfo.data,
+            metadata: pageInfo.metadata,
+            // relatedUrls: pageInfo.relatedUrls
+          }
           // 保存页面数据到文件
           const dataFile = path.join(dataDir, `${taskId}.json`);
 
@@ -149,7 +157,7 @@ export class CrawlerService {
 
           // 更新任务状态中的结果
           if (currentTask) {
-            const updatedResults = currentTask.results ? [...currentTask.results, pageData] : [pageInfo as any];
+            const updatedResults = currentTask.results ? [...currentTask.results, pageData] : [pageData as any];
             tasks.set(taskId, {
               ...currentTask,
               results: updatedResults
@@ -203,6 +211,7 @@ export class CrawlerService {
     this.logger.debug(`Getting page info for ${currentUrl}`);
     const requestBody = {
       urls: currentUrl,
+      screenshot: true,
       extraction_config: {
         type: 'llm',
         params: {
@@ -221,7 +230,8 @@ export class CrawlerService {
 
     try {
       const { result } = await submitAndWait(requestBody);
-      this.logger.debug(`Task created: ${result}`);
+      this.logger.debug(result);
+      this.logger.debug(result.screenshot);
       return {
         url: currentUrl,
         screenshot: result.screenshot,
