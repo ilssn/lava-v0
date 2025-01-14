@@ -26,6 +26,8 @@ export class UploadService {
 
       // 添加前缀
       formData.append('prefix', config.upload.prefix);
+      // 压缩
+      formData.append('need_compress', 'true');
 
       // 发送请求
       const response = await axios.post(config.upload.imageUploadUrl, formData, {
@@ -45,7 +47,7 @@ export class UploadService {
     } finally {
       // 清理临时文件
       try {
-        await fs.unlink(filePath);
+        // await fs.unlink(filePath);
       } catch (error) {
         this.logger.warn(`Failed to delete temporary file ${filePath}: ${error.message}`);
       }

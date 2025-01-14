@@ -20,16 +20,12 @@ export class CrawlerController {
   ) { }
 
   @Post('task')
-  async createTask(@Body() task: CrawlerTaskDto): Promise<{ taskId: string }> {
-    try {
-      const taskId = await this.crawlerService.startCrawling(task);
-      return { taskId };
-    } catch (error) {
-      throw new HttpException(
-        error.message || 'Failed to start crawler task',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+  async startCrawling(@Body() task: CrawlerTaskDto): Promise<{ taskId: string, message: string }> {
+    const taskId = await this.crawlerService.startCrawling(task);
+    return {
+      taskId,
+      message: 'Task has been successfully started'
+    };
   }
 
   @Get('task/:taskId')

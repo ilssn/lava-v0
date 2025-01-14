@@ -43,10 +43,18 @@ export interface RecursiveConfig {
 }
 
 export interface CrawlerTask {
-  url: string;
-  target?: string;  // 任务描述，用于筛选相关链接
-  recursiveConfig?: RecursiveConfig;
-  schema?: Schema;  // 数据提取模式，也用于辅助判断链接相关性
+  urls: string[];
+  target: string;
+  schema: any;
+  recursiveConfig?: {
+    maxUrls?: number;
+    maxDepth?: number;
+    urlFilters?: {
+      include?: string[];
+      exclude?: string[];
+      articlePattern?: string;
+    };
+  };
 }
 
 export interface ExtractedInfo {

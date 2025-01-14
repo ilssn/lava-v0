@@ -94,7 +94,7 @@ export class CrawlerService {
   private async processCrawlerTask(taskId: string, task: CrawlerTask) {
     try {
       // 初始化已处理URL集合
-      this.processedUrls.set(taskId, new Set([task.url]));
+      this.processedUrls.set(taskId, new Set(task.urls));
 
       this.tasks.set(taskId, {
         taskId,
@@ -107,7 +107,7 @@ export class CrawlerService {
       const tasks = this.tasks;
       const logger = this.logger;
 
-      logger.debug(`Starting crawler for URL: ${task.url}`);
+      logger.debug(`Starting crawler for URLs: ${task.urls.join(', ')}`);
 
       // 创建新的存储目录
       const dataDir = path.join(process.cwd(), 'storage', 'datasets', taskId);
@@ -119,10 +119,12 @@ export class CrawlerService {
 
       // 添加计数器
       let processedCount = 0;
-      const maxUrls = task.recursiveConfig?.maxUrls || 1;
+      const maxUrls = task.recursiveConfig?.maxUrls || task.urls.length;
 
-      // 初始URL加入队列
-      await requestQueue.addRequest({ url: task.url });
+      // 将所有初始URL加入队列
+      for (const url of task.urls) {
+        await requestQueue.addRequest({ url });
+      }
 
       while (processedCount < maxUrls) {
         const request = await requestQueue.fetchNextRequest();
@@ -134,16 +136,23 @@ export class CrawlerService {
         try {
           // 获取页面信息
           const pageInfo = await this.getPageInfo(task, url);
-          logger.debug(`Page info: ${JSON.stringify(pageInfo.screenshot)}`);
+          // logger.debug(`Page info: ${JSON.stringify(pageInfo.markdown)}`);
 
           // 处理页面信息（例如，保存数据、截图等）
-          // const imageUrl = await uploadService.uploadImage(pageInfo.screenshot)
+          // 截图
+          const screenshotPath = path.join(process.cwd(), 'storage', 'screenshots', `${taskId}-${request.id}.png`);
+          await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
+          await fs.writeFile(screenshotPath, pageInfo.screenshot, 'base64');
+          const imageUrl = await uploadService.uploadImage(screenshotPath)
+          logger.debug(`Uploaded image: ${imageUrl}`);
 
           const pageData = {
             url: pageInfo.url,
-            screenshot: pageInfo.screenshot,
+            screenshot: imageUrl,
             data: pageInfo.data,
             metadata: pageInfo.metadata,
+            markdown: pageInfo.markdown,
+            html: pageInfo.html,
             // relatedUrls: pageInfo.relatedUrls
           }
           // 保存页面数据到文件
@@ -212,6 +221,7 @@ export class CrawlerService {
     const requestBody = {
       urls: currentUrl,
       screenshot: true,
+      cache_mode: "disabled",
       extraction_config: {
         type: 'llm',
         params: {
@@ -230,14 +240,16 @@ export class CrawlerService {
 
     try {
       const { result } = await submitAndWait(requestBody);
-      this.logger.debug(result);
-      this.logger.debug(result.screenshot);
+      // this.logger.debug(result);
+      // this.logger.debug(result.screenshot);
       return {
         url: currentUrl,
         screenshot: result.screenshot,
         data: JSON.parse(result.extracted_content),
         metadata: result.metadata,
         relatedUrls: result.links,
+        markdown: result.markdown_v2.markdown_with_citations,
+        html: result.cleaned_html,
       }
     } catch (error) {
       this.logger.error(`Error creating task: ${error.message}`);

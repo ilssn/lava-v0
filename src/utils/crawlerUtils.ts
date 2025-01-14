@@ -3,10 +3,16 @@ import axios from 'axios';
 
 export async function submitAndWait(requestData, timeout = 300000) { // timeout in milliseconds
   const baseUrl = 'http://localhost:11235'; // 请根据实际情况修改
+  // const baseUrl = 'https://test-crawl4ai.havethefeb.autos'; // 请根据实际情况修改
+  const token = 'sk-test1234567890';
 
   try {
     // 提交爬虫任务
-    const response = await axios.post(`${baseUrl}/crawl`, requestData);
+    const response = await axios.post(`${baseUrl}/crawl`, requestData, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
     const taskId = response.data.task_id;
     console.log(`Task ID: ${taskId}`);
 
@@ -17,7 +23,11 @@ export async function submitAndWait(requestData, timeout = 300000) { // timeout 
         throw new Error(`Task ${taskId} did not complete within ${timeout / 1000} seconds`);
       }
 
-      const result = await axios.get(`${baseUrl}/task/${taskId}`);
+      const result = await axios.get(`${baseUrl}/task/${taskId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       const status = result.data;
 
       if (status.status === 'failed') {

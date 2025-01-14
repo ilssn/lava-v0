@@ -1,51 +1,27 @@
-import { IsString, IsOptional, IsNumber, ValidateNested, IsObject, IsEnum } from 'class-validator';
+import { IsArray, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class SchemaFieldDto {
-  @IsEnum(['string', 'number', 'float', 'array', 'object'])
-  type: 'string' | 'number' | 'float' | 'array' | 'object';
-
-  @IsOptional()
-  @IsEnum(['string', 'number', 'float', 'object'])
-  itemType?: 'string' | 'number' | 'float' | 'object';
-
-  @IsOptional()
-  items?: SchemaFieldDto;
-
-  @IsOptional()
-  properties?: {
-    [key: string]: SchemaFieldDto;
-  };
-}
-
-export class RecursiveConfigDto {
-  @IsNumber()
-  maxDepth: number;
-
-  @IsNumber()
-  @IsOptional()
-  maxUrls?: number;
-
-  @IsString()
-  @IsOptional()
-  urlPattern?: string;
-
-  @IsString()
-  @IsOptional()
-  excludePattern?: string;
-}
-
 export class CrawlerTaskDto {
+  @IsArray()
+  @IsString({ each: true })
+  urls: string[];
+
   @IsString()
-  url: string;
+  target: string;
 
-  @IsOptional()
   @ValidateNested()
-  @Type(() => RecursiveConfigDto)
-  recursiveConfig?: RecursiveConfigDto;
+  @Type(() => Object)
+  schema: any;
 
-  @IsOptional()
-  schema?: {
-    [key: string]: SchemaFieldDto;
+  @ValidateNested()
+  @Type(() => Object)
+  recursiveConfig?: {
+    maxUrls?: number;
+    maxDepth?: number;
+    urlFilters?: {
+      include?: string[];
+      exclude?: string[];
+      articlePattern?: string;
+    };
   };
 } 
