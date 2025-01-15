@@ -1,4 +1,4 @@
-import { IsArray, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsString, ValidateNested, IsObject, IsOptional, IsBoolean, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CrawlerTaskDto {
@@ -23,5 +23,31 @@ export class CrawlerTaskDto {
       exclude?: string[];
       articlePattern?: string;
     };
+  };
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => Object)
+  proxyConfig?: {
+    proxyUrl: string;
+    proxyUsername: string;
+    proxyPassword: string;
+  };
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => Object)
+  browserConfig?: {
+    headless: boolean;
+    browserType: string;
+    viewportWidth: number;
+    viewportHeight: number;
+    userAgent: string;
+    cacheEnabled: boolean;
+    jsEnabled: boolean;
+    lightMode: boolean;
+    textMode: boolean;
+    cookies: Array<{ url: string }>;
+    headers: Record<string, string>;
   };
 } 

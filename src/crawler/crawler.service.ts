@@ -136,14 +136,12 @@ export class CrawlerService {
         try {
           // 获取页面信息
           const pageInfo = await this.getPageInfo(task, url);
-          // logger.debug(`Page info: ${JSON.stringify(pageInfo.markdown)}`);
 
           // 处理页面信息（例如，保存数据、截图等）
-          // 截图
           const screenshotPath = path.join(process.cwd(), 'storage', 'screenshots', `${taskId}-${request.id}.png`);
           await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
           await fs.writeFile(screenshotPath, pageInfo.screenshot, 'base64');
-          const imageUrl = await uploadService.uploadImage(screenshotPath)
+          const imageUrl = await uploadService.uploadImage(screenshotPath);
           logger.debug(`Uploaded image: ${imageUrl}`);
 
           const pageData = {
@@ -153,12 +151,10 @@ export class CrawlerService {
             metadata: pageInfo.metadata,
             markdown: pageInfo.markdown,
             html: pageInfo.html,
-            // relatedUrls: pageInfo.relatedUrls
-          }
+          };
+
           // 保存页面数据到文件
           const dataFile = path.join(dataDir, `${taskId}.json`);
-
-          // 在使用之前声明 currentTask
           const currentTask = tasks.get(taskId);
           const currentData = currentTask?.results ? [...currentTask.results, pageData] : [pageData];
           await fs.writeFile(dataFile, JSON.stringify(currentData, null, 2), 'utf-8');
@@ -169,10 +165,9 @@ export class CrawlerService {
             const updatedResults = currentTask.results ? [...currentTask.results, pageData] : [pageData as any];
             tasks.set(taskId, {
               ...currentTask,
-              results: updatedResults
+              results: updatedResults,
             });
           }
-          // ...
 
           // 从页面信息中提取相关链接
           const relatedUrls = pageInfo.relatedUrls.internal.map(link => link.href);
@@ -189,7 +184,13 @@ export class CrawlerService {
           await requestQueue.markRequestHandled(request);
         } catch (error) {
           logger.error(`Error processing URL ${url}: ${error.message}`);
-          await requestQueue.reclaimRequest(request);
+          // 更新任务状态为失败
+          this.tasks.set(taskId, {
+            taskId,
+            status: 'failed',
+            error: error.message,
+          });
+          break; // 结束任务
         }
       }
 
@@ -199,10 +200,10 @@ export class CrawlerService {
 
       // 设置最终状态
       const finalResults = this.tasks.get(taskId);
-      if (finalResults) {
+      if (finalResults && finalResults.status !== 'failed') {
         this.tasks.set(taskId, {
           ...finalResults,
-          status: 'completed'
+          status: 'completed',
         });
       }
     } catch (error) {
@@ -218,10 +219,61 @@ export class CrawlerService {
 
   private async getPageInfo(task: CrawlerTask, currentUrl: string) {
     this.logger.debug(`Getting page info for ${currentUrl}`);
+
+    // 定义 crawler_params 的类型
+    const crawler_params: {
+      verbose: boolean;
+      magic: boolean;
+      word_count_threshold: number;
+      headless: boolean;
+      browser_type: string;
+      viewport_width: number;
+      viewport_height: number;
+      light_mode: boolean;
+      text_mode: boolean;
+      js_enabled: boolean;
+      user_agent?: string;
+      headers?: Record<string, string>;
+      cookies?: Array<{ url: string }>;
+      proxy_config?: {
+        server: string;
+        username: string;
+        password: string;
+      };
+    } = {
+      verbose: true,
+      magic: true,
+      word_count_threshold: 5,
+      headless: task.browserConfig?.headless,
+      browser_type: task.browserConfig?.browserType,
+      viewport_width: task.browserConfig?.viewportWidth,
+      viewport_height: task.browserConfig?.viewportHeight,
+      light_mode: task.browserConfig?.lightMode,
+      text_mode: task.browserConfig?.textMode,
+      js_enabled: task.browserConfig?.jsEnabled,
+    };
+
+    if (task.browserConfig?.userAgent) {
+      crawler_params.user_agent = task.browserConfig.userAgent;
+    }
+    if (task.browserConfig?.headers) {
+      crawler_params.headers = task.browserConfig.headers;
+    }
+    if (task.browserConfig?.cookies) {
+      crawler_params.cookies = task.browserConfig.cookies;
+    }
+    if (task.proxyConfig && task.proxyConfig.proxyUrl) {
+      crawler_params.proxy_config = {
+        server: task.proxyConfig.proxyUrl,
+        username: task.proxyConfig.proxyUsername,
+        password: task.proxyConfig.proxyPassword,
+      };
+    }
+
     const requestBody = {
       urls: currentUrl,
       screenshot: true,
-      cache_mode: "disabled",
+      cache_mode: task.browserConfig?.cacheEnabled ? "enabled" : "disabled",
       extraction_config: {
         type: 'llm',
         params: {
@@ -233,22 +285,19 @@ export class CrawlerService {
           schema: task.schema
         }
       },
-      crawler_params: {
-        verbose: 'True'
-      }
+      crawler_params, // 使用定义好的 crawler_params
     };
+
+    this.logger.debug(`Request body: ${JSON.stringify(requestBody)}`);
 
     try {
       const { result } = await submitAndWait(requestBody);
-      // this.logger.debug(result);
-      // this.logger.debug(result.screenshot);
       return {
         url: currentUrl,
         screenshot: result.screenshot,
         data: JSON.parse(result.extracted_content),
         metadata: result.metadata,
         relatedUrls: result.links,
-        // markdown: result.markdown_v2.markdown_with_citations,
         markdown: result.markdown,
         html: result.cleaned_html,
       }
