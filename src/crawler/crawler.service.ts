@@ -248,7 +248,8 @@ export class CrawlerService {
         data: JSON.parse(result.extracted_content),
         metadata: result.metadata,
         relatedUrls: result.links,
-        markdown: result.markdown_v2.markdown_with_citations,
+        // markdown: result.markdown_v2.markdown_with_citations,
+        markdown: result.markdown,
         html: result.cleaned_html,
       }
     } catch (error) {
