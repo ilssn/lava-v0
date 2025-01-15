@@ -120,10 +120,11 @@ export class CrawlerService {
       // 添加计数器
       let processedCount = 0;
       const maxUrls = task.recursiveConfig?.maxUrls || task.urls.length;
+      const maxDepth = task.recursiveConfig?.maxDepth || 1;
 
-      // 将所有初始URL加入队列
+      // 将所有初始URL加入队列，初始深度为1
       for (const url of task.urls) {
-        await requestQueue.addRequest({ url });
+        await requestQueue.addRequest({ url, userData: { depth: 1 } });
       }
 
       while (processedCount < maxUrls) {
@@ -131,11 +132,13 @@ export class CrawlerService {
         if (!request) break;
 
         const url = request.url;
-        logger.log(`Processing URL: ${url} (${processedCount + 1}/${maxUrls})`);
+        const depth = request.userData.depth || 1;
+        logger.log(`Processing URL: ${url} at depth ${depth} (${processedCount + 1}/${maxUrls})`);
 
         try {
           // 获取页面信息
           const pageInfo = await this.getPageInfo(task, url);
+          pageInfo.depth = depth; // 在 pageInfo 中添加深度信息
 
           // 处理页面信息（例如，保存数据、截图等）
           const screenshotPath = path.join(process.cwd(), 'storage', 'screenshots', `${taskId}-${request.id}.png`);
@@ -151,6 +154,7 @@ export class CrawlerService {
             metadata: pageInfo.metadata,
             markdown: pageInfo.markdown,
             html: pageInfo.html,
+            depth: pageInfo.depth,
           };
 
           // 保存页面数据到文件
@@ -170,13 +174,16 @@ export class CrawlerService {
           }
 
           // 从页面信息中提取相关链接
-          const relatedUrls = pageInfo.relatedUrls.internal.map(link => link.href);
+          const relatedUrls = pageInfo.relatedUrls.internal;
 
-          // 将相关链接加入队列
-          for (const relatedUrl of relatedUrls) {
-            if (!this.getProcessedUrls(taskId).has(relatedUrl)) {
-              await requestQueue.addRequest({ url: relatedUrl });
-              this.getProcessedUrls(taskId).add(relatedUrl);
+          // 如果当前深度小于最大深度，将相关链接加入队列
+          if (depth < maxDepth) {
+            for (const relatedUrlObj of relatedUrls) {
+              const relatedUrl = relatedUrlObj.href; // 提取 href 属性
+              if (!this.getProcessedUrls(taskId).has(relatedUrl)) {
+                await requestQueue.addRequest({ url: relatedUrl, userData: { depth: depth + 1 } });
+                this.getProcessedUrls(taskId).add(relatedUrl);
+              }
             }
           }
 
@@ -217,30 +224,10 @@ export class CrawlerService {
     }
   }
 
-  private async getPageInfo(task: CrawlerTask, currentUrl: string) {
+  private async getPageInfo(task: CrawlerTask, currentUrl: string): Promise<ExtractedInfo> {
     this.logger.debug(`Getting page info for ${currentUrl}`);
 
-    // 定义 crawler_params 的类型
-    const crawler_params: {
-      verbose: boolean;
-      magic: boolean;
-      word_count_threshold: number;
-      headless: boolean;
-      browser_type: string;
-      viewport_width: number;
-      viewport_height: number;
-      light_mode: boolean;
-      text_mode: boolean;
-      js_enabled: boolean;
-      user_agent?: string;
-      headers?: Record<string, string>;
-      cookies?: Array<{ url: string }>;
-      proxy_config?: {
-        server: string;
-        username: string;
-        password: string;
-      };
-    } = {
+    const crawler_params: any = {
       verbose: true,
       magic: true,
       word_count_threshold: 5,
@@ -251,25 +238,24 @@ export class CrawlerService {
       light_mode: task.browserConfig?.lightMode,
       text_mode: task.browserConfig?.textMode,
       js_enabled: task.browserConfig?.jsEnabled,
-    };
-
-    if (task.browserConfig?.userAgent) {
-      crawler_params.user_agent = task.browserConfig.userAgent;
-    }
-    if (task.browserConfig?.headers) {
-      crawler_params.headers = task.browserConfig.headers;
-    }
-    if (task.browserConfig?.cookies) {
-      crawler_params.cookies = task.browserConfig.cookies;
     }
     if (task.proxyConfig && task.proxyConfig.proxyUrl) {
       crawler_params.proxy_config = {
         server: task.proxyConfig.proxyUrl,
         username: task.proxyConfig.proxyUsername,
         password: task.proxyConfig.proxyPassword,
-      };
+      }
     }
-
+    if (task.browserConfig?.cookies) {
+      crawler_params.cookies = task.browserConfig.cookies;
+    }
+    if (task.browserConfig?.headers) {
+      crawler_params.headers = task.browserConfig.headers;
+    }
+    if (task.browserConfig?.userAgent) {
+      crawler_params.user_agent = task.browserConfig.userAgent;
+    }
+    // 定义请求体
     const requestBody = {
       urls: currentUrl,
       screenshot: true,
@@ -285,7 +271,8 @@ export class CrawlerService {
           schema: task.schema
         }
       },
-      crawler_params, // 使用定义好的 crawler_params
+      crawler_params: crawler_params
+
     };
 
     this.logger.debug(`Request body: ${JSON.stringify(requestBody)}`);
@@ -297,9 +284,12 @@ export class CrawlerService {
         screenshot: result.screenshot,
         data: JSON.parse(result.extracted_content),
         metadata: result.metadata,
-        relatedUrls: result.links,
+        relatedUrls: result.links, // 确保 relatedUrls.internal 是一个字符串数组,
         markdown: result.markdown,
         html: result.cleaned_html,
+        depth: 0, // 初始化 depth 属性
+        author: result.author || 'Unknown', // 提供默认值或从 result 中获取
+        publishDate: result.publishDate || 'Unknown', // 提供默认值或从 result 中获取
       }
     } catch (error) {
       this.logger.error(`Error creating task: ${error.message}`);

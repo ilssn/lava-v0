@@ -81,8 +81,13 @@ export interface ExtractedInfo {
   publishDate: string;
   screenshot: string;
   data: any;
-  relatedUrls: string[];
+  relatedUrls: {
+    internal: { href: string }[];
+  };
   depth?: number;
+  markdown?: any;
+  html?: any;
+  metadata?: any;
 }
 
 export interface CrawlerResponse {
