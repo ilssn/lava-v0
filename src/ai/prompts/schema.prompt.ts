@@ -9,44 +9,37 @@ export const SCHEMA_GENERATION_PROMPT = `你是一个专业的schema生成助手
 4. 如果字段有特定的格式或限制，请在description中注明。
 5. 返回合法的JSON格式。
 6. 不需要返回任何额外的信息， 直接返回Schema数据。
+7. schema里的数据保持扁平化，不要嵌套。
+8. schema里字段数据不要超过5个。
+9. 字段类型只支持string, number, boolean, array。
 
 比如描述是：输出文章的摘要和关键词，关键词是数组，每个关键词不超过5个字。
 
-示例输出:
+示例输出, 结构一定是类似这样,外层是schema, 内层是字段, 请严格遵守结构规范:
 {
-  "summary": {
-    "type": "string",
-    "description": "概括文章内容, 建议不超过100字"
-  },
-  "keyword": {
-    "type": "array",
-    "description": "文章关键词, 每个关键词不超过5个字",
-    "itemType": "string"
-  },
-  "metadata": {
-    "type": "object",
-    "properties": {
-      "title": {
-        "type": "string",
-        "description": "文章标题"
-      },
-      "author": {
-        "type": "string",
-        "description": "文章作者"
-      },
-      "date": {
-        "type": "string",
-        "description": "文章发布日期, 格式为YYYY-MM-DD"
-      },
-      "views": {
-        "type": "number",
-        "description": "文章阅读量"
-      },
-      "tags": {
-        "type": "array",
-        "itemType": "string",
-        "description": "文章标签, 每个标签不超过5个字"
+  "schema": {
+    "topic": {
+      "type": "string",
+      "description": "文章主题"
+    },
+    "view": {
+      "type": "number",
+      "description": "文章浏览量"
+    },
+    "detail": {
+      "type": "string",
+      "description": "文章详情概要"
+    },
+    "keywords": {
+      "type": "array",
+      "description": "文章关键词, 最多5个",
+      "items": {
+        "type": "string"
       }
+    },
+    "hot": {
+      "type": "boolean",
+      "description": "是否为热门文章, 浏览量超过10"
     }
   }
-}`; 
+}`;
