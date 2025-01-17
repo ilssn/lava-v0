@@ -30,12 +30,13 @@ export class ExtractorService {
 
   constructor(private readonly aiService: AIService, private configService: ConfigService) { }
 
-  private async callModel(prompt: string, useSecondaryModel = false) {
+  private async callModel(prompt: string, useSecondaryModel = false, authorization: string) {
     const config = this.configService.get('config');
-    return this.aiService.callModelWithConfig(prompt, useSecondaryModel, config);
+    return this.aiService.callModelWithConfig(prompt, useSecondaryModel, config, authorization);
   }
 
-  async extractStructuredData(text: string, schema?: Schema) {
+  async extractStructuredData(text: string, schema?: Schema, headers?: any) {
+    const authorization = headers?.authorization;
     try {
       this.logger.debug('Preparing structured data extraction prompt');
       const prompt = STRUCTURED_DATA_EXTRACTION_PROMPT
@@ -44,7 +45,7 @@ export class ExtractorService {
       this.logger.debug('AI Extract Data Schema: %s', schema);
 
       this.logger.debug('Calling AI model for structured data extraction');
-      const response = await this.callModel(prompt);
+      const response = await this.callModel(prompt, false, authorization);
 
       this.logger.debug('Parsing AI response');
       try {
@@ -59,7 +60,8 @@ export class ExtractorService {
     }
   }
 
-  async extractRelatedLinks(links: LinkInfo[], target?: string, schema?: Schema): Promise<string[]> {
+  async extractRelatedLinks(links: LinkInfo[], target?: string, schema?: Schema, headers?: any): Promise<string[]> {
+    const authorization = headers?.authorization;
     try {
       this.logger.debug('Preparing related links extraction prompt');
       const prompt = RELATED_LINKS_EXTRACTION_PROMPT
@@ -68,7 +70,7 @@ export class ExtractorService {
         .replace('{links}', JSON.stringify(links, null, 2));
 
       this.logger.debug('Calling AI model for related links extraction');
-      const response = await this.callModel(prompt, true);
+      const response = await this.callModel(prompt, true, authorization);
 
       this.logger.debug('Parsing AI response');
       let parsedLinks;

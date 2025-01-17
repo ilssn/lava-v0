@@ -1,10 +1,11 @@
 // src/utils/crawlerUtils.js
 import axios from 'axios';
+import { ConfigService } from '@nestjs/config';
 
 export async function submitAndWait(requestData, timeout = 300000) { // timeout in milliseconds
-  const baseUrl = 'http://localhost:11235'; // 请根据实际情况修改
-  // const baseUrl = 'https://test-crawl4ai.havethefeb.autos'; // 请根据实际情况修改
-  const token = 'sk-test1234567890';
+  const configService = new ConfigService(); // 创建 ConfigService 实例
+  const baseUrl = configService.get('CRAWLER_BASE_URL'); // 获取 CRAWLER_BASE_URL
+  const token = configService.get('CRAWLER_TOKEN'); // 获取 CRAWLER_TOKEN
 
   try {
     // 提交爬虫任务

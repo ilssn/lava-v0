@@ -28,14 +28,14 @@ export class CrawlerService {
     private uploadService: UploadService,
   ) { }
 
-  async startCrawling(task: CrawlerTask): Promise<string> {
+  async startCrawling(task: CrawlerTask, authorization: string): Promise<string> {
     const taskId = uuidv4();
     this.tasks.set(taskId, {
       taskId,
       status: 'pending',
     });
 
-    this.processCrawlerTask(taskId, task).catch((error) => {
+    this.processCrawlerTask(taskId, task, authorization).catch((error) => {
       this.logger.error(`Error processing task ${taskId}: ${error.message}`);
       this.tasks.set(taskId, {
         taskId,
@@ -91,7 +91,7 @@ export class CrawlerService {
     return this.processedUrls.get(taskId)!;
   }
 
-  private async processCrawlerTask(taskId: string, task: CrawlerTask) {
+  private async processCrawlerTask(taskId: string, task: CrawlerTask, authorization: string) {
     try {
       // 初始化已处理URL集合
       this.processedUrls.set(taskId, new Set(task.urls));
@@ -137,7 +137,7 @@ export class CrawlerService {
 
         try {
           // 获取页面信息
-          const pageInfo = await this.getPageInfo(task, url);
+          const pageInfo = await this.getPageInfo(task, url, authorization);
           pageInfo.depth = depth; // 在 pageInfo 中添加深度信息
 
           // 处理页面信息（例如，保存数据、截图等）
@@ -224,7 +224,7 @@ export class CrawlerService {
     }
   }
 
-  private async getPageInfo(task: CrawlerTask, currentUrl: string): Promise<ExtractedInfo> {
+  private async getPageInfo(task: CrawlerTask, currentUrl: string, authorization: string): Promise<ExtractedInfo> {
     this.logger.debug(`Getting page info for ${currentUrl}`);
 
     const crawler_params: any = {
@@ -263,9 +263,9 @@ export class CrawlerService {
       extraction_config: {
         type: 'llm',
         params: {
-          provider: 'gpt-4o',
-          base_url: 'https://api.302.ai/v1',
-          api_token: 'sk-IOIhA9NVd4OVVtF8LwxsyIuJx36gxrd3VnnTtbVogROvBENs',
+          provider: this.configService.get('config.openai.model'),
+          base_url: this.configService.get('config.openai.baseUrl'),
+          api_token: authorization.split(' ')[1],
           instruction: task.target,
           extract_type: 'schema',
           schema: task.schema

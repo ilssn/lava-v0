@@ -9,10 +9,11 @@ export class SchemaService {
 
   constructor(private readonly aiService: AIService, private configService: ConfigService) { }
 
-  async generateSchemaFromDescription(description: string): Promise<any> {
+  async generateSchemaFromDescription(description: string, headers: any): Promise<any> {
+    const authorization = headers.authorization;
     const prompt = SCHEMA_GENERATION_PROMPT.replace('{description}', description);
     const config = this.configService.get('config');
-    const response = await this.aiService.callModelWithConfig(prompt, false, config);
+    const response = await this.aiService.callModelWithConfig(prompt, false, config, authorization);
     this.logger.debug(`Generated schema: ${response}`);
     try {
       return JSON.parse(response);
