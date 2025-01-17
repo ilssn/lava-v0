@@ -118,6 +118,14 @@ npm run lint
 npm run test
 ```
 
+## 部署
+
+```bash
+docker-compose up -d
+docker-compose down
+docker-compose restart
+```
+
 ## 注意事项
 
 1. 请确保配置了正确的 OpenAI API Key

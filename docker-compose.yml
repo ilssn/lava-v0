@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      OPENAI_SECONDARY_MODEL: ${OPENAI_SECONDARY_MODEL}
+      CRAWLER_HEADLESS: ${CRAWLER_HEADLESS}
+      MAX_REQUEST_RETRIES: ${MAX_REQUEST_RETRIES}
+      REQUEST_HANDLER_TIMEOUT: ${REQUEST_HANDLER_TIMEOUT}
+      STORAGE_DIR: ${STORAGE_DIR}
+      CRAWLER_BASE_URL: ${CRAWLER_BASE_URL}
+      CRAWLER_TOKEN: ${CRAWLER_TOKEN}
+      SERVER_PORT: ${SERVER_PORT}
+    volumes:
+      - .:/app
+    command: npm run start:prod
