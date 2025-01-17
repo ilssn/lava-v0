@@ -18,6 +18,7 @@ async function bootstrap() {
     prefix: '/static', // 访问静态文件时的URL前缀
   });
 
-  await app.listen(3000);
+  await app.listen(process.env.SERVER_PORT);
+  console.log(`Server is running on port ${process.env.SERVER_PORT}`);
 }
 bootstrap(); 
