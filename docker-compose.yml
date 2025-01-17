@@ -21,4 +21,4 @@ services:
       SERVER_PORT: ${SERVER_PORT}
     volumes:
       - .:/app
-    command: ["node", "dist/main"]
+    # command: ["node", "dist/main"]

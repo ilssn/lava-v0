@@ -30,7 +30,7 @@ coverage/
 Thumbs.db
 
 # NestJS 特定文件
-/dist
+# /dist
 /node_modules
 
 # 临时文件
