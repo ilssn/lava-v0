@@ -21,4 +21,4 @@ services:
       SERVER_PORT: ${SERVER_PORT}
     volumes:
       - .:/app
-    command: npm run start:prod
+    command: ["node", "dist/main"]
