@@ -1,23 +1,23 @@
-# 使用官方 Node.js 镜像作为基础镜像
+# Use the official Node.js image as the base image
 FROM node:20
 
-# 设置工作目录
-WORKDIR /app
+# Set the working directory inside the container
+WORKDIR /usr/src/app
 
-# 复制 package.json 和 package-lock.json
+# Copy package.json and package-lock.json to the working directory
 COPY package*.json ./
 
-# 安装依赖
+# Install the application dependencies
 RUN npm install
 
-# 复制应用代码
+# Copy the rest of the application files
 COPY . .
 
-# 构建应用
+# Build the NestJS application
 RUN npm run build
 
-# 暴露应用运行的端口
+# Expose the application port
 EXPOSE 9001
 
-# 启动应用
+# Command to run the application
 CMD ["node", "dist/main"]
