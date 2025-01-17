@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # 暴露应用运行的端口
-EXPOSE 9000
+EXPOSE 9001
 
 # 启动应用
 CMD ["npm", "run", "start:prod"]
